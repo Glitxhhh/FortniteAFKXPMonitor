@@ -35,7 +35,7 @@ Focus detection depends on your desktop (Wayland has no generic way to ask):
 | --- | --- |
 | Hyprland | `hyprctl` (included) |
 | Sway | `swaymsg` (included) |
-| KDE Plasma (Wayland) | [`kdotool`](https://github.com/jinliu/kdotool) |
+| KDE Plasma (Wayland) | [`kdotool`](https://github.com/jinliu/kdotool) (check your distro repos / the AUR) |
 | Any X11 session | `xdotool` |
 | GNOME (Wayland) | not supported - turn off "Only send input while the game is focused" |
 

@@ -42,7 +42,7 @@ public sealed class LinuxWindowDetector : IWindowDetector
             }
             else
             {
-                Problem = "KDE Wayland focus detection needs 'kdotool' installed (e.g. 'sudo pacman -S kdotool'), "
+                Problem = "KDE Wayland focus detection needs 'kdotool' installed (check your distro's repos or the AUR), "
                           + "or turn off \"only send input while the game is focused\".";
             }
         }
@@ -127,15 +127,27 @@ public sealed class LinuxWindowDetector : IWindowDetector
         return null;
     }
 
-    private static WindowInfo Kde()
+    // kdotool talks to KWin over D-Bus, so every call is slow. Class and pid never change for a given
+    // window, so they're cached per window id and only the title (which browser tabs change) is re-read.
+    private string _kdeId = "";
+    private string _kdeClass = "";
+    private string _kdePid = "";
+
+    private WindowInfo Kde()
     {
         string? id = Run("kdotool", "getactivewindow")?.Trim();
         if (string.IsNullOrEmpty(id)) return WindowInfo.None;
 
-        string cls = Run("kdotool", $"getwindowclassname {id}")?.Trim() ?? "";
+        if (id != _kdeId)
+        {
+            _kdeClass = Run("kdotool", $"getwindowclassname {id}")?.Trim() ?? "";
+            int.TryParse(Run("kdotool", $"getwindowpid {id}")?.Trim(), out int pid);
+            _kdePid = ProcessName(pid);
+            _kdeId = id;
+        }
+
         string title = Run("kdotool", $"getwindowname {id}")?.Trim() ?? "";
-        int.TryParse(Run("kdotool", $"getwindowpid {id}")?.Trim(), out int pid);
-        return new WindowInfo(ProcessName(pid), cls, title);
+        return new WindowInfo(_kdePid, _kdeClass, title);
     }
 
     private static WindowInfo X11()
