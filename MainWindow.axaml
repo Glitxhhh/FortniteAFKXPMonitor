@@ -1,0 +1,108 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="FortniteAFKXPMonitor.MainWindow"
+        Title="Fortnite AFK XP Tool" Width="500" SizeToContent="Height" CanResize="False"
+        Background="#14151F" Icon="/Assets/Icon.png"
+        WindowStartupLocation="CenterScreen" FontSize="13">
+    <StackPanel Margin="20">
+
+        <TextBlock Text="Fortnite AFK XP Tool" FontSize="22" FontWeight="Bold" Margin="0,0,0,2"/>
+        <TextBlock Classes="muted" TextWrapping="Wrap" Margin="0,0,0,16"
+                   Text="Auto-click, hold input and camera nudges for GeForce NOW, GeForce Infinity, Amazon Luna, Xbox Cloud and Fortnite."/>
+
+        <!-- Status -->
+        <Border Classes="card">
+            <StackPanel>
+                <TextBlock Text="STATUS" Classes="section"/>
+                <TextBlock x:Name="StatusText" Text="Stopped" FontSize="18" FontWeight="Bold"/>
+                <TextBlock x:Name="TargetText" Classes="muted" TextWrapping="Wrap" Margin="0,2,0,12"/>
+
+                <Grid ColumnDefinitions="*,*">
+                    <StackPanel>
+                        <TextBlock Text="Next camera nudge" Classes="muted" FontSize="11"/>
+                        <TextBlock x:Name="NudgeCountdown" Text="--:--" FontSize="26" FontWeight="Bold"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="Since last camera input" Classes="muted" FontSize="11"/>
+                        <TextBlock x:Name="SinceNudge" Text="--:--" FontSize="26" FontWeight="Bold"/>
+                    </StackPanel>
+                </Grid>
+
+                <ProgressBar x:Name="TimeoutBar" MinHeight="6" Height="6" Minimum="0" Maximum="420" Value="0"
+                             Margin="0,10,0,4" Background="#12131C" Foreground="#7C5CFF"/>
+                <TextBlock x:Name="StatsText" Classes="muted" FontSize="11" Text="7:00 XP timeout window"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Input settings -->
+        <Border Classes="card">
+            <StackPanel x:Name="SettingsPanel">
+                <TextBlock Text="INPUT" Classes="section"/>
+
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                    <RadioButton x:Name="ActionMouse" Content="Mouse click" GroupName="action" IsChecked="True"/>
+                    <RadioButton x:Name="ActionKey" Content="Keystroke" GroupName="action"/>
+                </StackPanel>
+
+                <StackPanel x:Name="MouseRow" Orientation="Horizontal" Margin="0,0,0,8">
+                    <TextBlock Text="Button" Classes="muted" Width="70" VerticalAlignment="Center"/>
+                    <RadioButton x:Name="BtnLeft" Content="Left" GroupName="btn" IsChecked="True"/>
+                    <RadioButton x:Name="BtnRight" Content="Right" GroupName="btn"/>
+                    <RadioButton x:Name="BtnMiddle" Content="Middle" GroupName="btn"/>
+                </StackPanel>
+
+                <StackPanel x:Name="KeyRow" Orientation="Horizontal" Margin="0,0,0,8" IsVisible="False">
+                    <TextBlock Text="Key" Classes="muted" Width="70" VerticalAlignment="Center"/>
+                    <TextBox x:Name="KeyBox" Width="140" IsReadOnly="True" Text="Space"
+                             ToolTip.Tip="Click, then press the key to use"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                    <TextBlock Text="Mode" Classes="muted" Width="70" VerticalAlignment="Center"/>
+                    <RadioButton x:Name="ModeAuto" Content="Auto (repeat)" GroupName="mode" IsChecked="True"/>
+                    <RadioButton x:Name="ModeHold" Content="Hold" GroupName="mode"/>
+                </StackPanel>
+
+                <StackPanel x:Name="IntervalRow" Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock Text="Interval" Classes="muted" Width="70" VerticalAlignment="Center"/>
+                    <TextBox x:Name="IntervalBox" Width="80" Text="100"/>
+                    <TextBlock Text="ms between presses" Classes="muted" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Nudge settings -->
+        <Border Classes="card">
+            <StackPanel x:Name="NudgePanel">
+                <TextBlock Text="ANTI-AFK CAMERA NUDGE" Classes="section"/>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                    <TextBlock Text="Every" Classes="muted" Width="70" VerticalAlignment="Center"/>
+                    <TextBox x:Name="NudgeMinutesBox" Width="80" Text="5"/>
+                    <TextBlock Text="minutes (±10%, max 6:30)" Classes="muted" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                    <TextBlock Text="Distance" Classes="muted" Width="70" VerticalAlignment="Center"/>
+                    <TextBox x:Name="NudgePixelsBox" Width="80" Text="60"/>
+                    <TextBlock Text="pixels (varied each time), then returns" Classes="muted" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                </StackPanel>
+                <CheckBox x:Name="RequireTargetBox" IsChecked="True">
+                    <TextBlock TextWrapping="Wrap" MaxWidth="400"
+                               Text="Only send input while Fortnite, GeForce NOW, GeForce Infinity, Amazon Luna or Xbox Cloud is focused"/>
+                </CheckBox>
+            </StackPanel>
+        </Border>
+
+        <!-- Controls -->
+        <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+            <Button x:Name="ToggleButton" Content="Start" Classes="primary" Click="Toggle_Click"/>
+            <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
+                <TextBlock Text="Hotkey" Classes="muted" FontSize="11"/>
+                <TextBox x:Name="HotkeyBox" Width="90" IsReadOnly="True" Text="F6"
+                         ToolTip.Tip="Click, then press a key to rebind the global start/stop hotkey"/>
+            </StackPanel>
+        </Grid>
+
+        <TextBlock x:Name="WarningText" Foreground="#FBBF24" FontSize="11" Margin="0,10,0,0"
+                   TextWrapping="Wrap" IsVisible="False"/>
+    </StackPanel>
+</Window>

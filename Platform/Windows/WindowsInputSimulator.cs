@@ -1,39 +1,45 @@
 using System.Runtime.InteropServices;
-using static FortniteAFKXPMonitor.Services.NativeMethods;
+using Avalonia.Input;
+using FortniteAFKXPMonitor.Services;
+using static FortniteAFKXPMonitor.Platform.Windows.NativeMethods;
 
-namespace FortniteAFKXPMonitor.Services;
-
-public enum MouseButtonKind { Left, Right, Middle }
+namespace FortniteAFKXPMonitor.Platform.Windows;
 
 /// <summary>SendInput wrapper. Keys use hardware scan codes so games that ignore virtual-key input still see them.</summary>
-public static class InputSimulator
+public sealed class WindowsInputSimulator : IInputSimulator
 {
     private static readonly int InputSize = Marshal.SizeOf<INPUT>();
 
-    public static void MouseDown(MouseButtonKind b) => SendMouse(b switch
+    public string? Problem => null;
+
+    public void MouseDown(MouseButtonKind b) => SendMouse(b switch
     {
         MouseButtonKind.Right => MOUSEEVENTF_RIGHTDOWN,
         MouseButtonKind.Middle => MOUSEEVENTF_MIDDLEDOWN,
         _ => MOUSEEVENTF_LEFTDOWN,
     });
 
-    public static void MouseUp(MouseButtonKind b) => SendMouse(b switch
+    public void MouseUp(MouseButtonKind b) => SendMouse(b switch
     {
         MouseButtonKind.Right => MOUSEEVENTF_RIGHTUP,
         MouseButtonKind.Middle => MOUSEEVENTF_MIDDLEUP,
         _ => MOUSEEVENTF_LEFTUP,
     });
 
-    public static void MouseMoveRelative(int dx, int dy)
+    public void MouseMoveRelative(int dx, int dy)
     {
         var input = new INPUT { type = INPUT_MOUSE };
         input.u.mi = new MOUSEINPUT { dx = dx, dy = dy, dwFlags = MOUSEEVENTF_MOVE };
         Send(input);
     }
 
-    public static void KeyDown(int vk) => SendKey(vk, false);
+    public void KeyDown(Key key) => SendKey(key, false);
 
-    public static void KeyUp(int vk) => SendKey(vk, true);
+    public void KeyUp(Key key) => SendKey(key, true);
+
+    public void Dispose()
+    {
+    }
 
     private static void SendMouse(uint flags)
     {
@@ -42,8 +48,11 @@ public static class InputSimulator
         Send(input);
     }
 
-    private static void SendKey(int vk, bool up)
+    private static void SendKey(Key key, bool up)
     {
+        if (!KeyMap.TryGetVk(key, out int vk))
+            return;
+
         uint mapped = MapVirtualKey((uint)vk, MAPVK_VK_TO_VSC_EX);
         var input = new INPUT { type = INPUT_KEYBOARD };
         uint flags = up ? KEYEVENTF_KEYUP : 0;

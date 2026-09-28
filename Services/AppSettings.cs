@@ -1,20 +1,23 @@
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using Avalonia.Input;
 
 namespace FortniteAFKXPMonitor.Services;
 
 public enum ActionKind { Mouse, Key }
 
-public enum ClickMode { Auto, Hold }
+public enum RepeatMode { Auto, Hold }
 
 public sealed class AppSettings
 {
     public ActionKind Action { get; set; } = ActionKind.Mouse;
-    public ClickMode Mode { get; set; } = ClickMode.Auto;
+    public RepeatMode Mode { get; set; } = RepeatMode.Auto;
     public MouseButtonKind MouseButton { get; set; } = MouseButtonKind.Left;
 
-    /// <summary>Windows virtual-key code of the key to tap/hold (default Space).</summary>
-    public int KeyVk { get; set; } = 0x20;
+    /// <summary>Key to tap/hold (default Space).</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public Key Key { get; set; } = Key.Space;
 
     /// <summary>Delay between taps/clicks in Auto mode.</summary>
     public int IntervalMs { get; set; } = 100;
@@ -28,7 +31,14 @@ public sealed class AppSettings
     public bool RequireTarget { get; set; } = true;
 
     /// <summary>Global start/stop hotkey (default F6).</summary>
-    public int HotkeyVk { get; set; } = 0x75;
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public Key Hotkey { get; set; } = Key.F6;
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = true,
+        Converters = { new JsonStringEnumConverter() },
+    };
 
     private static string FilePath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -39,7 +49,7 @@ public sealed class AppSettings
         try
         {
             if (File.Exists(FilePath))
-                return JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(FilePath)) ?? new AppSettings();
+                return JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(FilePath), JsonOptions) ?? new AppSettings();
         }
         catch
         {
@@ -53,7 +63,7 @@ public sealed class AppSettings
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
+            File.WriteAllText(FilePath, JsonSerializer.Serialize(this, JsonOptions));
         }
         catch
         {

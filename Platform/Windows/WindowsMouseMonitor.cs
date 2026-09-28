@@ -1,14 +1,15 @@
 using System.Runtime.InteropServices;
-using static FortniteAFKXPMonitor.Services.NativeMethods;
+using FortniteAFKXPMonitor.Services;
+using static FortniteAFKXPMonitor.Platform.Windows.NativeMethods;
 
-namespace FortniteAFKXPMonitor.Services;
+namespace FortniteAFKXPMonitor.Platform.Windows;
 
 /// <summary>
 /// Low-level mouse hook that reports movement from a real mouse. Input injected by this app
 /// (or any SendInput caller) carries the injected flag and is ignored, so our own camera
 /// nudges never count. Must be started on a thread with a message loop (the UI thread).
 /// </summary>
-public sealed class MouseActivityMonitor : IDisposable
+public sealed class WindowsMouseMonitor : IMouseActivityMonitor
 {
     // Ignore tiny jitter; a real camera move adds up to this many pixels quickly.
     private const int MinDistance = 4;
@@ -21,7 +22,9 @@ public sealed class MouseActivityMonitor : IDisposable
 
     public event Action? UserMoved;
 
-    public MouseActivityMonitor() => _proc = HookCallback;
+    public string? Problem => null;
+
+    public WindowsMouseMonitor() => _proc = HookCallback;
 
     public void Start()
     {

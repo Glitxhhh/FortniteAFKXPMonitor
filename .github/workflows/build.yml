@@ -12,23 +12,20 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    runs-on: windows-latest
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0   # need tags to work out the next version
-
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.x
 
       # Next version = latest vX.Y.Z tag with the patch bumped.
       # Put [minor] or [major] in a commit message to bump those instead.
       # With no tags yet, the first release uses the <Version> in the csproj.
       - name: Compute version
         id: version
-        shell: bash
         run: |
           last=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)
           if [ -z "$last" ]; then
@@ -44,29 +41,68 @@ jobs:
           echo "version=$next" >> "$GITHUB_OUTPUT"
           echo "Building version $next"
 
+  build:
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+          - os: ubuntu-latest
+            rid: linux-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
       - name: Publish (self-contained single file)
+        shell: bash
         run: >
-          dotnet publish FortniteAFKXPMonitor.csproj -c Release -r win-x64 --self-contained
+          dotnet publish FortniteAFKXPMonitor.csproj -c Release -r ${{ matrix.rid }} --self-contained
           -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
           -p:EnableCompressionInSingleFile=true -p:DebugType=None
-          -p:Version=${{ steps.version.outputs.version }}
+          -p:Version=${{ needs.version.outputs.version }}
           -o publish
 
       - name: Package
-        shell: pwsh
-        run: Compress-Archive -Path publish/FortniteAFKXPMonitor.exe -DestinationPath FortniteAFKXPMonitor-v${{ steps.version.outputs.version }}-win-x64.zip
+        shell: bash
+        run: |
+          name="FortniteAFKXPMonitor-v${{ needs.version.outputs.version }}-${{ matrix.rid }}"
+          mkdir -p dist
+          if [ "${{ matrix.rid }}" = "win-x64" ]; then
+            (cd publish && 7z a -tzip "../dist/$name.zip" FortniteAFKXPMonitor.exe)
+          else
+            mkdir -p "pkg/$name"
+            cp publish/FortniteAFKXPMonitor "pkg/$name/"
+            cp linux/99-fortnite-afk-xp.rules "pkg/$name/"
+            chmod +x "pkg/$name/FortniteAFKXPMonitor"
+            tar -czf "dist/$name.tar.gz" -C pkg "$name"
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
-          name: FortniteAFKXPMonitor-v${{ steps.version.outputs.version }}
-          path: publish/FortniteAFKXPMonitor.exe
+          name: dist-${{ matrix.rid }}
+          path: dist/*
+
+  release:
+    needs: [version, build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          path: dist
+          merge-multiple: true
 
       - name: Tag & release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          v="v${{ steps.version.outputs.version }}"
-          gh release create "$v" "FortniteAFKXPMonitor-$v-win-x64.zip" \
-            --target "$GITHUB_SHA" --title "$v" --generate-notes
+          v="v${{ needs.version.outputs.version }}"
+          gh release create "$v" dist/* \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$v" --generate-notes

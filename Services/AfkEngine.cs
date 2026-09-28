@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using static FortniteAFKXPMonitor.Services.NativeMethods;
+using FortniteAFKXPMonitor.Platform.Windows;
 
 namespace FortniteAFKXPMonitor.Services;
 
@@ -13,6 +13,8 @@ public sealed class AfkEngine
     /// <summary>Fortnite stops awarding AFK XP after this long without camera input.</summary>
     public const double XpTimeoutSeconds = 7 * 60;
 
+    private readonly IInputSimulator _input;
+    private readonly IWindowDetector _detector;
     private readonly Random _rng = Random.Shared;
     private CancellationTokenSource? _cts;
     private Task? _loop;
@@ -31,6 +33,12 @@ public sealed class AfkEngine
     private AppSettings _settings = new();
     private long _lastManualTicks;
     private int _manualResets;
+
+    public AfkEngine(IInputSimulator input, IWindowDetector detector)
+    {
+        _input = input;
+        _detector = detector;
+    }
 
     public bool IsRunning => _cts is not null;
 
@@ -122,8 +130,10 @@ public sealed class AfkEngine
 
     private void Run(AppSettings s, CancellationToken ct)
     {
-        timeBeginPeriod(1);
+        if (OperatingSystem.IsWindows()) NativeMethods.timeBeginPeriod(1);
         bool held = false;
+        long nextDetect = 0;
+        long detectTicks = Math.Max(1, _detector.PollIntervalMs) * Stopwatch.Frequency / 1000;
         bool wasBlocked = false;
         long nextAction = 0;
         long intervalTicks = Math.Max(10, s.IntervalMs) * Stopwatch.Frequency / 1000;
@@ -132,7 +142,11 @@ public sealed class AfkEngine
         {
             while (!ct.IsCancellationRequested)
             {
-                _target = TargetDetector.GetForeground();
+                if (Stopwatch.GetTimestamp() >= nextDetect)
+                {
+                    _target = TargetMatcher.Match(_detector.GetForeground());
+                    nextDetect = Stopwatch.GetTimestamp() + detectTicks;
+                }
                 bool canSend = !s.RequireTarget || _target.IsTarget;
 
                 if (!canSend)
@@ -156,7 +170,7 @@ public sealed class AfkEngine
 
                     long now = Stopwatch.GetTimestamp();
 
-                    if (s.Mode == ClickMode.Hold)
+                    if (s.Mode == RepeatMode.Hold)
                     {
                         if (!held)
                         {
@@ -193,23 +207,23 @@ public sealed class AfkEngine
         {
             if (held)
                 Release(s);
-            timeEndPeriod(1);
+            if (OperatingSystem.IsWindows()) NativeMethods.timeEndPeriod(1);
         }
     }
 
-    private static void Press(AppSettings s)
+    private void Press(AppSettings s)
     {
-        if (s.Action == ActionKind.Mouse) InputSimulator.MouseDown(s.MouseButton);
-        else InputSimulator.KeyDown(s.KeyVk);
+        if (s.Action == ActionKind.Mouse) _input.MouseDown(s.MouseButton);
+        else _input.KeyDown(s.Key);
     }
 
-    private static void Release(AppSettings s)
+    private void Release(AppSettings s)
     {
-        if (s.Action == ActionKind.Mouse) InputSimulator.MouseUp(s.MouseButton);
-        else InputSimulator.KeyUp(s.KeyVk);
+        if (s.Action == ActionKind.Mouse) _input.MouseUp(s.MouseButton);
+        else _input.KeyUp(s.Key);
     }
 
-    private static void Tap(AppSettings s, CancellationToken ct)
+    private void Tap(AppSettings s, CancellationToken ct)
     {
         Press(s);
         ct.WaitHandle.WaitOne(8);
@@ -266,7 +280,7 @@ public sealed class AfkEngine
             if (i == steps) { x = dx; y = dy; }         // land exactly
 
             if (x != prevX || y != prevY)
-                InputSimulator.MouseMoveRelative(x - prevX, y - prevY);
+                _input.MouseMoveRelative(x - prevX, y - prevY);
             prevX = x; prevY = y;
 
             if (ct.WaitHandle.WaitOne(_rng.Next(7, 22))) return false;
