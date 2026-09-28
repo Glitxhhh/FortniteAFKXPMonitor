@@ -39,3 +39,9 @@
 
 # debug information files
 *.dwo
+
+# .NET
+bin/
+obj/
+.vs/
+*.user
