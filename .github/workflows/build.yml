@@ -17,10 +17,38 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       icon_only: ${{ steps.version.outputs.icon_only }}
+      sha: ${{ steps.regen-icon.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0   # need tags to work out the next version
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      # Keeps icon.ico in sync whenever someone only swaps in a new Icon.png - the push then
+      # touches just the two icon files, so it flows straight into the icon-only path below
+      # (no version bump, the release's builds just get refreshed assets).
+      - name: Regenerate icon.ico from Icon.png
+        id: regen-icon
+        run: |
+          pip install --quiet pillow
+          python scripts/generate-icon.py
+
+          if git diff --quiet -- Assets/icon.ico; then
+            echo "icon.ico already matches Icon.png"
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "icon.ico is out of date but this is a PR build - not committing"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add Assets/icon.ico
+            git commit -m "Regenerate icon.ico from Icon.png [skip ci]"
+            git push origin HEAD:"${GITHUB_REF_NAME}"
+            echo "Committed regenerated icon.ico"
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       # Next version = latest vX.Y.Z tag with the patch bumped.
       # Put [minor] or [major] in a commit message to bump those instead.
@@ -67,6 +95,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.sha }}
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -122,5 +152,5 @@ jobs:
             gh release upload "$v" dist/* --repo "$GITHUB_REPOSITORY" --clobber
           else
             gh release create "$v" dist/* \
-              --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$v" --generate-notes
+              --repo "$GITHUB_REPOSITORY" --target "${{ needs.version.outputs.sha }}" --title "$v" --generate-notes
           fi
