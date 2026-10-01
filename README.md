@@ -2,6 +2,8 @@
 
 A small cross-platform (.NET 10 + Avalonia) utility for AFK XP sessions on **GeForce NOW**, **GeForce Infinity**, **Amazon Luna**, **Xbox Cloud Gaming** and the native **Fortnite** client. Runs on Windows and Linux.
 
+> **Disclaimer:** this tool simulates input and automates camera movement, which may be against the terms of service of Fortnite, GeForce NOW, GeForce Infinity, Amazon Luna, Xbox Cloud Gaming or Epic's AFK XP policies. There is no guarantee it won't be detected now or in the future. **Use at your own risk** - the author is not responsible for banned, suspended or restricted accounts resulting from the use of this tool.
+
 ## Features
 
 - **Input modes**: mouse click (left/right/middle) or any keystroke, each in
