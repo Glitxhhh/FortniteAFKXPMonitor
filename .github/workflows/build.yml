@@ -16,6 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      icon_only: ${{ steps.version.outputs.icon_only }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -24,22 +25,34 @@ jobs:
       # Next version = latest vX.Y.Z tag with the patch bumped.
       # Put [minor] or [major] in a commit message to bump those instead.
       # With no tags yet, the first release uses the <Version> in the csproj.
+      # If the only files changed since that tag are the icon assets, the
+      # version isn't bumped at all - the rebuilt exes just replace the
+      # assets on that same release further down.
       - name: Compute version
         id: version
         run: |
           last=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)
+          icon_only=false
           if [ -z "$last" ]; then
             next=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' FortniteAFKXPMonitor.csproj | head -n1)
           else
-            IFS=. read -r major minor patch <<< "${last#v}"
-            msg=$(git log -1 --pretty=%B)
-            if [[ "$msg" == *"[major]"* ]]; then major=$((major+1)); minor=0; patch=0
-            elif [[ "$msg" == *"[minor]"* ]]; then minor=$((minor+1)); patch=0
-            else patch=$((patch+1)); fi
-            next="$major.$minor.$patch"
+            changed=$(git diff --name-only "$last" HEAD)
+            if [ -n "$changed" ] && ! echo "$changed" | grep -qvE '^Assets/(Icon\.png|icon\.ico)$'; then
+              icon_only=true
+              next="${last#v}"
+              echo "Only icon assets changed since $last - reusing version $next"
+            else
+              IFS=. read -r major minor patch <<< "${last#v}"
+              msg=$(git log -1 --pretty=%B)
+              if [[ "$msg" == *"[major]"* ]]; then major=$((major+1)); minor=0; patch=0
+              elif [[ "$msg" == *"[minor]"* ]]; then minor=$((minor+1)); patch=0
+              else patch=$((patch+1)); fi
+              next="$major.$minor.$patch"
+            fi
           fi
           echo "version=$next" >> "$GITHUB_OUTPUT"
-          echo "Building version $next"
+          echo "icon_only=$icon_only" >> "$GITHUB_OUTPUT"
+          echo "Building version $next (icon_only=$icon_only)"
 
   build:
     needs: version
@@ -104,5 +117,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           v="v${{ needs.version.outputs.version }}"
-          gh release create "$v" dist/* \
-            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$v" --generate-notes
+          if [ "${{ needs.version.outputs.icon_only }}" = "true" ] && gh release view "$v" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Icon-only change - replacing build assets on existing release $v"
+            gh release upload "$v" dist/* --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$v" dist/* \
+              --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$v" --generate-notes
+          fi

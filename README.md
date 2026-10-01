@@ -54,4 +54,14 @@ Requires the .NET 10 SDK. Settings are stored in `%AppData%\FortniteAFKXPMonitor
 
 CI builds both platforms on every push to `main`, bumps the patch version (`[minor]` / `[major]` in a commit message bumps those), and publishes a GitHub release.
 
-Replace `Assets/icon.ico` and `Assets/Icon.png` to change the app icon.
+To change the app icon, replace `Assets/Icon.png` (any resolution - it's what the window itself displays)
+then regenerate `Assets/icon.ico` (used for the exe/taskbar icon) from it:
+
+```
+python scripts/generate-icon.py
+```
+
+Requires Pillow (`pip install pillow`). `.ico` files can't hold anything bigger than 256x256 - that's a
+limit of the format itself, not this script - so it's generated at 16 up to 256. Commit both files; if the
+push only touches `Assets/Icon.png` and `Assets/icon.ico`, CI skips the version bump and replaces the
+builds on the current release instead of cutting a new one.
