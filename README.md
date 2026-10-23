@@ -26,11 +26,16 @@ Download the `linux-x64` archive from Releases. Input is sent through a virtual 
 
 ```bash
 sudo usermod -aG input "$USER"
-echo uinput | sudo tee /etc/modules-load.d/uinput.conf
 sudo cp 99-fortnite-afk-xp.rules /etc/udev/rules.d/
-sudo udevadm control --reload-rules && sudo modprobe uinput && sudo udevadm trigger
+sudo udevadm control --reload-rules
+# Only load uinput if /dev/uinput doesn't exist yet. Many kernels (SteamOS / CachyOS "deckify" handheld
+# builds, ...) have it built in, in which case there is no module and modprobe would fail.
+[ -e /dev/uinput ] || { sudo modprobe uinput && echo uinput | sudo tee /etc/modules-load.d/uinput.conf; }
+sudo udevadm trigger
 # log out and back in so the group change applies
 ```
+
+If `/dev/uinput` still doesn't exist after that, your kernel was built without `uinput` and you'll need one that has it (e.g. `linux-cachyos`).
 
 Focus detection depends on your desktop (Wayland has no generic way to ask):
 
