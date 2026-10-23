@@ -43,9 +43,17 @@ Focus detection depends on your desktop (Wayland has no generic way to ask):
 | --- | --- |
 | Hyprland | `hyprctl` (included) |
 | Sway | `swaymsg` (included) |
-| KDE Plasma (Wayland) | [`kdotool`](https://github.com/jinliu/kdotool) (check your distro repos / the AUR) |
+| KDE Plasma (Wayland) | [`kdotool`](https://github.com/jinliu/kdotool) (AUR on Arch-based distros) |
 | Any X11 session | `xdotool` |
 | GNOME (Wayland) | not supported - turn off "Only send input while the game is focused" |
+
+The archive includes `install-focus-tool.sh`, which works out your session and distro and installs the right one. Run it from a terminal inside your desktop session:
+
+```bash
+./install-focus-tool.sh            # add --dry-run to see what it would do first, --yes to skip prompts
+```
+
+It supports Arch-based distros (pacman, plus `paru`/`yay` or a manual `makepkg` for the AUR), Debian/Ubuntu, Fedora and openSUSE. `kdotool` is only packaged in the AUR, so on the other families it's built from crates.io with `cargo` (the script installs the build dependencies; if the build complains about the Rust version, install a current toolchain from [rustup.rs](https://rustup.rs)). Immutable systems like SteamOS aren't handled.
 
 The global hotkey on Linux is not swallowed, so the focused app also sees the key. Pick a key the game doesn't use (F6 is fine for most).
 

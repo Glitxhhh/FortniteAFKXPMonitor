@@ -121,8 +121,8 @@ jobs:
           else
             mkdir -p "pkg/$name"
             cp publish/FortniteAFKXPMonitor "pkg/$name/"
-            cp linux/99-fortnite-afk-xp.rules "pkg/$name/"
-            chmod +x "pkg/$name/FortniteAFKXPMonitor"
+            cp linux/99-fortnite-afk-xp.rules linux/install-focus-tool.sh "pkg/$name/"
+            chmod +x "pkg/$name/FortniteAFKXPMonitor" "pkg/$name/install-focus-tool.sh"
             tar -czf "dist/$name.tar.gz" -C pkg "$name"
           fi
 

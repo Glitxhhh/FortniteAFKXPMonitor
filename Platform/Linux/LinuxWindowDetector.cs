@@ -42,7 +42,7 @@ public sealed class LinuxWindowDetector : IWindowDetector
             }
             else
             {
-                Problem = "KDE Wayland focus detection needs 'kdotool' installed (check your distro's repos or the AUR), "
+                Problem = "KDE Wayland focus detection needs 'kdotool'. Run install-focus-tool.sh from the release archive to install it, "
                           + "or turn off \"only send input while the game is focused\".";
             }
         }
@@ -55,7 +55,8 @@ public sealed class LinuxWindowDetector : IWindowDetector
             }
             else
             {
-                Problem = "X11 focus detection needs 'xdotool' installed, or turn off \"only send input while the game is focused\".";
+                Problem = "X11 focus detection needs 'xdotool'. Run install-focus-tool.sh from the release archive to install it, "
+                          + "or turn off \"only send input while the game is focused\".";
             }
         }
         else
