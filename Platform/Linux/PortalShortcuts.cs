@@ -344,7 +344,7 @@ internal sealed class PortalShortcuts : IDisposable
 
     private string NextToken() => $"afk{Environment.ProcessId}_{Interlocked.Increment(ref _tokens)}";
 
-    private static string SessionBusAddress()
+    internal static string SessionBusAddress()
     {
         string? address = Environment.GetEnvironmentVariable("DBUS_SESSION_BUS_ADDRESS");
         if (!string.IsNullOrEmpty(address))

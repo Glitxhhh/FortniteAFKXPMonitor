@@ -82,7 +82,7 @@ When more than one path fires for the same key press (for example a physical key
 
 ### Alt+Tab
 
-While Alt is held the app stops sending input and releases anything it was holding, then re-checks which window is focused and waits about 0.4 seconds before resuming, so you can alt-tab away (it stays paused in the other window) or back (it resumes). On Linux this is needed because a window switcher like KDE's doesn't change the focused window until you let go of Alt. This watches the keyboards the app can read in `/dev/input`, so like the hotkey it can't see Alt on a Deskflow-forwarded keyboard.
+While Alt is held the app stops sending input and releases anything it was holding, then re-checks which window is focused and waits about 0.4 seconds before resuming, so you can alt-tab away (it stays paused in the other window) or back (it resumes). On Linux this is needed because a window switcher like KDE's doesn't change the focused window until you let go of Alt. It reads Alt from the keyboards the app can see in `/dev/input`, and on KDE it also listens for KWin's own window-switcher shortcut, so Alt+Tab is caught from any keyboard, including ones forwarded by Deskflow.
 
 ## Build
 

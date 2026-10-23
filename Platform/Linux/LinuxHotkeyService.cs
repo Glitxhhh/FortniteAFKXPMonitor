@@ -13,6 +13,7 @@ public sealed class LinuxHotkeyService : IHotkeyService
     private EvdevReader? _reader;
     private volatile int _code = -1;
     private PortalShortcuts? _portal;
+    private readonly KdeSwitcherWatcher _switcher = new();
     private int _altMask;   // bit 0 = left Alt held, bit 1 = right Alt held
 
     public event Action? Pressed;
@@ -25,7 +26,11 @@ public sealed class LinuxHotkeyService : IHotkeyService
 
     public void ConfigureGlobalShortcut() => _portal?.Configure();
 
-    public bool AltHeld => Volatile.Read(ref _altMask) != 0;
+    /// <summary>
+    /// True while a window switch (Alt+Tab) is in progress: Alt is held on a keyboard the app can read, or - on KDE,
+    /// for any keyboard including Deskflow-forwarded ones - KWin's window switcher is open.
+    /// </summary>
+    public bool AltHeld => Volatile.Read(ref _altMask) != 0 || _switcher.Active;
 
     public bool Register(Key key)
     {
@@ -44,6 +49,7 @@ public sealed class LinuxHotkeyService : IHotkeyService
             _portal = new PortalShortcuts();
             _portal.Activated += () => Pressed?.Invoke();
             _portal.Start(key);
+            _switcher.Start();   // KDE only: tells us when the Alt+Tab switcher is open, for any keyboard
         }
         else
         {
@@ -89,6 +95,7 @@ public sealed class LinuxHotkeyService : IHotkeyService
 
     public void Dispose()
     {
+        _switcher.Dispose();
         _portal?.Dispose();
         _reader?.Dispose();
         _reader = null;
