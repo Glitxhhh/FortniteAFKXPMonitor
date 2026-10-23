@@ -20,6 +20,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Linux helper scripts, embedded so the app can run them itself (see LinuxSetup). -->
+    <EmbeddedResource Include="linux\setup-input.sh" LogicalName="setup-input.sh" />
+    <EmbeddedResource Include="linux\install-focus-tool.sh" LogicalName="install-focus-tool.sh" />
+  </ItemGroup>
+
+  <ItemGroup>
     <AvaloniaResource Include="Assets\Icon.png" />
     <AvaloniaResource Include="Assets\icon.ico" />
   </ItemGroup>

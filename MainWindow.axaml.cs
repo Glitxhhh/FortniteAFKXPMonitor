@@ -3,6 +3,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Threading;
+using FortniteAFKXPMonitor.Platform.Linux;
 using FortniteAFKXPMonitor.Services;
 
 namespace FortniteAFKXPMonitor;
@@ -19,6 +20,12 @@ public partial class MainWindow : Window
     private readonly AfkEngine _engine;
     private readonly DispatcherTimer _ui = new() { Interval = TimeSpan.FromMilliseconds(200) };
     private readonly AppSettings _settings = AppSettings.Load();
+
+    // Linux only: what's still missing (input permissions, focus tool), re-read from the real system.
+    private readonly DispatcherTimer _setupTimer = new() { Interval = TimeSpan.FromSeconds(3) };
+    private IReadOnlyList<SetupItem> _setup = Array.Empty<SetupItem>();
+    private bool _setupChecking;
+    private bool _setupActionRunning;
 
     public MainWindow()
     {
@@ -40,11 +47,20 @@ public partial class MainWindow : Window
         _ui.Tick += (_, _) => RefreshStatus();
         _ui.Start();
         RefreshStatus();
+
+        if (OperatingSystem.IsLinux())
+        {
+            RequireTargetBox.IsCheckedChanged += (_, _) => _ = RefreshSetupAsync();
+            _setupTimer.Tick += async (_, _) => await RefreshSetupAsync();
+            _setupTimer.Start();
+            _ = RefreshSetupAsync();
+        }
     }
 
     protected override void OnClosed(EventArgs e)
     {
         _ui.Stop();
+        _setupTimer.Stop();
         _engine.Stop();
         _platform.Dispose();
         ReadSettingsFromUi();
@@ -167,8 +183,6 @@ public partial class MainWindow : Window
         ToggleButton.Content = running ? "Stop" : "Start";
         if (running) ToggleButton.Classes.Add("stop"); else ToggleButton.Classes.Remove("stop");
 
-        UpdateWarnings();
-
         bool paused = _engine.IsPaused;
         string hotkey = _settings.Hotkey.ToString();
 
@@ -214,17 +228,83 @@ public partial class MainWindow : Window
         StatsText.Text = $"{_engine.ActionCount:N0} inputs sent · {_engine.NudgeCount} camera nudges · {_engine.ManualResetCount} manual resets";
     }
 
-    /// <summary>Shows anything the platform layer couldn't set up (permissions, unsupported desktop...).</summary>
-    private void UpdateWarnings()
-    {
-        var problems = new List<string>();
-        if (_platform.Input.Problem is { } a) problems.Add(a);
-        if (_platform.Hotkey.Problem is { } b) problems.Add(b);
-        if (_platform.Mouse.Problem is { } c) problems.Add(c);
-        if (_platform.WindowDetector.Problem is { } d) problems.Add(d);
+    // ---- Linux setup card -------------------------------------------------
 
-        WarningText.IsVisible = problems.Count > 0;
-        WarningText.Text = string.Join("\n", problems);
+    /// <summary>
+    /// Re-checks what's missing and updates the card. Polls while something is missing and stops once
+    /// everything is fine, so on a configured system it costs one check at launch and then nothing.
+    /// </summary>
+    private async Task RefreshSetupAsync()
+    {
+        if (_setupChecking) return;
+        _setupChecking = true;
+        try
+        {
+            bool focusCheck = RequireTargetBox.IsChecked == true;
+            _setup = await Task.Run(() => LinuxSetup.Check(_platform.WindowDetector, focusCheck));
+            UpdateSetupCard();
+
+            if (_setup.All(i => i.State == SetupState.Ok))
+                _setupTimer.Stop();
+            else if (!_setupTimer.IsEnabled)
+                _setupTimer.Start();
+        }
+        finally
+        {
+            _setupChecking = false;
+        }
+    }
+
+    private void UpdateSetupCard()
+    {
+        SetupItem? input = _setup.FirstOrDefault(i => i.Id == LinuxSetup.InputId && i.State != SetupState.Ok);
+        SetupItem? tool = _setup.FirstOrDefault(i => i.Id == LinuxSetup.ToolId && i.State != SetupState.Ok);
+
+        InputRow.IsVisible = input is not null;
+        InputText.Text = input?.Detail ?? "";
+        InputButton.IsVisible = input?.CanFix == true;
+        InputButton.IsEnabled = !_setupActionRunning;
+
+        ToolRow.IsVisible = tool is not null;
+        ToolText.Text = tool?.Detail ?? "";
+        ToolButton.IsVisible = tool?.CanFix == true;
+        ToolButton.IsEnabled = !_setupActionRunning;
+
+        bool anyMissing = input is not null || tool is not null;
+        SetupCard.IsVisible = anyMissing;
+        if (!anyMissing)
+            SetupMessage.IsVisible = false;
+    }
+
+    private void ShowSetupMessage(SetupResult result)
+    {
+        SetupMessage.Text = result.Message;
+        SetupMessage.Foreground = result.Success ? Good : Warn;
+        SetupMessage.IsVisible = true;
+    }
+
+    private async void InputFix_Click(object? sender, RoutedEventArgs e)
+    {
+        _setupActionRunning = true;
+        UpdateSetupCard();
+        SetupMessage.Text = "Waiting for the password prompt...";
+        SetupMessage.Foreground = Primary;
+        SetupMessage.IsVisible = true;
+
+        SetupResult result = await LinuxSetup.FixInputAccessAsync();
+
+        _setupActionRunning = false;
+        ShowSetupMessage(result);
+        await RefreshSetupAsync();
+    }
+
+    private async void ToolFix_Click(object? sender, RoutedEventArgs e)
+    {
+        string? tool = _platform.WindowDetector.RequiredTool;
+        if (tool is null) return;
+
+        ShowSetupMessage(LinuxSetup.StartFocusToolInstall(tool));
+        await RefreshSetupAsync();
     }
 
     private void SetStatus(string text, IBrush brush)

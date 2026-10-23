@@ -6,64 +6,78 @@ namespace FortniteAFKXPMonitor.Platform.Linux;
 
 /// <summary>
 /// Wayland has no generic "which window is focused" API, so this picks a provider for the running
-/// desktop: Hyprland (hyprctl), Sway (swaymsg), KDE Plasma on Wayland (kdotool) or any X11 session (xdotool).
+/// desktop: Hyprland (hyprctl), Sway (swaymsg), niri (niri msg), KDE Plasma on Wayland (kdotool) or any X11
+/// session (xdotool).
 /// GNOME on Wayland exposes nothing usable and is reported as unsupported.
 /// </summary>
 public sealed class LinuxWindowDetector : IWindowDetector
 {
-    private readonly Func<WindowInfo>? _provider;
+    private volatile Func<WindowInfo>? _provider;
 
-    public int PollIntervalMs { get; }
+    public int PollIntervalMs { get; private set; }
 
-    public string? Problem { get; }
+    public string? Problem { get; private set; }
 
-    public LinuxWindowDetector()
+    public string? RequiredTool { get; private set; }
+
+    public LinuxWindowDetector() => Detect();
+
+    public void Refresh() => Detect();
+
+    private void Detect()
     {
         string session = Env("XDG_SESSION_TYPE").ToLowerInvariant();
         string desktop = Env("XDG_CURRENT_DESKTOP");
         bool wayland = session == "wayland" || Env("WAYLAND_DISPLAY").Length > 0;
 
-        if (Env("HYPRLAND_INSTANCE_SIGNATURE").Length > 0 && Available("hyprctl", "version"))
+        Func<WindowInfo>? provider = null;
+        string? problem = null;
+        string? tool = null;
+        int poll = 250;
+
+        if (Env("HYPRLAND_INSTANCE_SIGNATURE").Length > 0)
         {
-            _provider = Hyprland;
-            PollIntervalMs = 150;
+            tool = "hyprctl";
+            poll = 150;
+            if (LinuxTools.OnPath(tool)) provider = Hyprland;
+            else problem = "hyprctl ships with Hyprland but isn't on your PATH.";
         }
-        else if (Env("SWAYSOCK").Length > 0 && Available("swaymsg", "--version"))
+        else if (Env("SWAYSOCK").Length > 0)
         {
-            _provider = Sway;
-            PollIntervalMs = 150;
+            tool = "swaymsg";
+            poll = 150;
+            if (LinuxTools.OnPath(tool)) provider = Sway;
+            else problem = "swaymsg ships with Sway but isn't on your PATH.";
+        }
+        else if (Env("NIRI_SOCKET").Length > 0)
+        {
+            tool = "niri";
+            poll = 150;
+            if (LinuxTools.OnPath(tool)) provider = Niri;
+            else problem = "niri ships with the niri compositor but isn't on your PATH.";
         }
         else if (desktop.Contains("KDE", StringComparison.OrdinalIgnoreCase) && wayland)
         {
-            if (Available("kdotool", "--version"))
-            {
-                _provider = Kde;
-                PollIntervalMs = 250;
-            }
-            else
-            {
-                Problem = "KDE Wayland focus detection needs 'kdotool'. Run install-focus-tool.sh from the release archive to install it, "
-                          + "or turn off \"only send input while the game is focused\".";
-            }
+            tool = "kdotool";
+            if (LinuxTools.OnPath(tool)) provider = Kde;
+            else problem = "KDE Wayland focus detection needs 'kdotool'.";
         }
         else if (!wayland && Env("DISPLAY").Length > 0)
         {
-            if (Available("xdotool", "--version"))
-            {
-                _provider = X11;
-                PollIntervalMs = 250;
-            }
-            else
-            {
-                Problem = "X11 focus detection needs 'xdotool'. Run install-focus-tool.sh from the release archive to install it, "
-                          + "or turn off \"only send input while the game is focused\".";
-            }
+            tool = "xdotool";
+            if (LinuxTools.OnPath(tool)) provider = X11;
+            else problem = "X11 focus detection needs 'xdotool'.";
         }
         else
         {
-            Problem = "Focus detection isn't supported on this desktop (GNOME/other Wayland). "
+            problem = "Focus detection isn't supported on this desktop (GNOME/other Wayland). "
                       + "Turn off \"only send input while the game is focused\", or use KDE, Hyprland, Sway or X11.";
         }
+
+        RequiredTool = tool;
+        Problem = problem;
+        PollIntervalMs = poll;
+        _provider = provider;
     }
 
     public WindowInfo GetForeground()
@@ -108,6 +122,26 @@ public sealed class LinuxWindowDetector : IWindowDetector
             cls = Str(wp, "class"); // XWayland windows
         int pid = n.TryGetProperty("pid", out var p) && p.TryGetInt32(out int v) ? v : 0;
         return new WindowInfo(ProcessName(pid), cls, Str(n, "name"));
+    }
+
+    private static WindowInfo Niri() => ParseNiri(Run("niri", "msg --json focused-window"));
+
+    private static WindowInfo ParseNiri(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return WindowInfo.None;
+
+        using var doc = JsonDocument.Parse(json);
+        var r = doc.RootElement;
+
+        // The reply is the window object, or `null` when nothing is focused. Also accept the wrapped form the
+        // raw IPC socket uses ({"Ok":{"FocusedWindow":{...}}}) in case a future version prints that.
+        if (r.ValueKind == JsonValueKind.Object && r.TryGetProperty("Ok", out var ok)) r = ok;
+        if (r.ValueKind == JsonValueKind.Object && r.TryGetProperty("FocusedWindow", out var fw)) r = fw;
+        if (r.ValueKind != JsonValueKind.Object) return WindowInfo.None;
+
+        // title, app_id and pid are all optional in niri's IPC (pid is missing for some portal windows).
+        int pid = r.TryGetProperty("pid", out var p) && p.ValueKind == JsonValueKind.Number && p.TryGetInt32(out int v) ? v : 0;
+        return new WindowInfo(ProcessName(pid), Str(r, "app_id"), Str(r, "title"));
     }
 
     private static JsonElement? FindFocused(JsonElement node)
@@ -175,8 +209,6 @@ public sealed class LinuxWindowDetector : IWindowDetector
         try { return File.ReadAllText($"/proc/{pid}/comm").Trim(); }
         catch { return ""; }
     }
-
-    private static bool Available(string tool, string args) => Run(tool, args) is not null;
 
     /// <summary>Runs a tool and returns stdout, or null if it isn't installed / failed / timed out.</summary>
     private static string? Run(string tool, string args)

@@ -22,38 +22,38 @@ Download the `win-x64` zip from Releases and run the exe. If the game or streami
 
 ## Linux
 
-Download the `linux-x64` archive from Releases. Input is sent through a virtual `/dev/uinput` device and real mouse/keyboard events are read from `/dev/input`, so it works on Wayland and X11 (same approach as [CachyAutoClicker](https://github.com/Glitxhhh/CachyAutoClicker)). One-time setup:
+Download the `linux-x64` archive from Releases and run `FortniteAFKXPMonitor`. Input is sent through a virtual `/dev/uinput` device and real mouse/keyboard events are read from `/dev/input`, so it works on Wayland and X11 (same approach as [CachyAutoClicker](https://github.com/Glitxhhh/CachyAutoClicker)).
+
+### First-run setup
+
+On launch the app checks what's in place and, if something's missing, shows a **Setup needed** card with a button for each fix:
+
+- **Fix permissions** - asks for your password through the system's authentication dialog (polkit), then adds you to the `input` group, installs a udev rule for `/dev/uinput`, and loads the `uinput` module if the kernel doesn't already have it built in (many do, including the CachyOS handheld builds). **Log out and back in afterwards** so the group change applies, then start the app again.
+- **Install focus tool** - opens a terminal running `install-focus-tool.sh` (below), since it needs your sudo password and, on Arch, a chance to review the AUR package. The card updates by itself when it's done.
+
+There's no "setup done" flag to go stale: the checks look at the real system state every launch, and the card disappears once everything works. If `/dev/uinput` still doesn't exist after setup, your kernel was built without `uinput` and you'll need one that has it (e.g. `linux-cachyos`).
+
+Prefer a terminal? Both steps are plain scripts in the archive:
 
 ```bash
-sudo usermod -aG input "$USER"
-sudo cp 99-fortnite-afk-xp.rules /etc/udev/rules.d/
-sudo udevadm control --reload-rules
-# Only load uinput if /dev/uinput doesn't exist yet. Many kernels (SteamOS / CachyOS "deckify" handheld
-# builds, ...) have it built in, in which case there is no module and modprobe would fail.
-[ -e /dev/uinput ] || { sudo modprobe uinput && echo uinput | sudo tee /etc/modules-load.d/uinput.conf; }
-sudo udevadm trigger
-# log out and back in so the group change applies
+sudo ./setup-input.sh "$USER"      # permissions: input group + udev rule (+ uinput module if needed); then log out and back in
+./install-focus-tool.sh            # focus tool; add --dry-run to see what it would do first, --yes to skip prompts
 ```
 
-If `/dev/uinput` still doesn't exist after that, your kernel was built without `uinput` and you'll need one that has it (e.g. `linux-cachyos`).
+### Focus detection
 
-Focus detection depends on your desktop (Wayland has no generic way to ask):
+Wayland has no generic way to ask which window is focused, so the tool needed depends on your desktop:
 
 | Desktop | Needs |
 | --- | --- |
 | Hyprland | `hyprctl` (included) |
 | Sway | `swaymsg` (included) |
+| niri | `niri` (included) |
 | KDE Plasma (Wayland) | [`kdotool`](https://github.com/jinliu/kdotool) (AUR on Arch-based distros) |
 | Any X11 session | `xdotool` |
 | GNOME (Wayland) | not supported - turn off "Only send input while the game is focused" |
 
-The archive includes `install-focus-tool.sh`, which works out your session and distro and installs the right one. Run it from a terminal inside your desktop session:
-
-```bash
-./install-focus-tool.sh            # add --dry-run to see what it would do first, --yes to skip prompts
-```
-
-It supports Arch-based distros (pacman, plus `paru`/`yay` or a manual `makepkg` for the AUR), Debian/Ubuntu, Fedora and openSUSE. `kdotool` is only packaged in the AUR, so on the other families it's built from crates.io with `cargo` (the script installs the build dependencies; if the build complains about the Rust version, install a current toolchain from [rustup.rs](https://rustup.rs)). Immutable systems like SteamOS aren't handled.
+`install-focus-tool.sh` works out your session and distro and installs the right tool. It supports Arch-based distros (pacman, plus `paru`/`yay` or a manual `makepkg` for the AUR), Debian/Ubuntu, Fedora and openSUSE. `kdotool` is only packaged in the AUR, so on the other families it's built from crates.io with `cargo` (the script installs the build dependencies; if the build complains about the Rust version, install a current toolchain from [rustup.rs](https://rustup.rs)). `hyprctl`, `swaymsg` and `niri` come with their compositors, so the script only checks they're present. Immutable systems like SteamOS aren't handled.
 
 The global hotkey on Linux is not swallowed, so the focused app also sees the key. Pick a key the game doesn't use (F6 is fine for most).
 

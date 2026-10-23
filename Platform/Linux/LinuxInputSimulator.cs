@@ -36,7 +36,7 @@ public sealed class LinuxInputSimulator : IInputSimulator
         if (fd < 0)
         {
             Problem = "Can't open /dev/uinput (permission denied or module not loaded). "
-                      + "Add your user to the 'input' group and set up the udev rule from the README, then log out and back in.";
+                      + "Use \"Fix permissions\" in the setup card, or run setup-input.sh from the release archive, then log out and back in.";
             return;
         }
 

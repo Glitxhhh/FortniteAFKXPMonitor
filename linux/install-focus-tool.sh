@@ -7,6 +7,7 @@
 #
 #   Hyprland              hyprctl   (ships with Hyprland)
 #   Sway                  swaymsg   (ships with Sway)
+#   niri                  niri      (ships with niri)
 #   KDE Plasma (Wayland)  kdotool
 #   X11 (any desktop)     xdotool
 #
@@ -40,7 +41,7 @@ Installs the window-focus tool the Fortnite AFK XP Tool needs on Linux.
 
 Usage: install-focus-tool.sh [options]
 
-  --tool NAME    install NAME (hyprctl, swaymsg, kdotool or xdotool) instead of detecting it
+  --tool NAME    install NAME (hyprctl, swaymsg, niri, kdotool or xdotool) instead of detecting it
   -y, --yes      don't ask for confirmation (passes --noconfirm / -y to the package manager)
   -n, --dry-run  show what would be done without installing anything
   -h, --help     show this help
@@ -151,6 +152,8 @@ detect_tool() {
     TOOL=hyprctl; REASON="Hyprland session"
   elif [ -n "${SWAYSOCK:-}" ]; then
     TOOL=swaymsg; REASON="Sway session"
+  elif [ -n "${NIRI_SOCKET:-}" ]; then
+    TOOL=niri; REASON="niri session"
   elif [ "$wayland" -eq 1 ] && [[ "$desktop" == *KDE* ]]; then
     TOOL=kdotool; REASON="KDE Plasma on Wayland"
   elif [ "$wayland" -eq 0 ] && [ -n "${DISPLAY:-}" ]; then
@@ -275,8 +278,8 @@ say "Distro:  $DISTRO_NAME (package family: ${FAMILY:-unknown})"
 
 case "$FORCE_TOOL" in
   "")                                    detect_tool ;;
-  hyprctl|swaymsg|kdotool|xdotool)       TOOL="$FORCE_TOOL"; REASON="requested with --tool" ;;
-  *) die "--tool must be one of: hyprctl, swaymsg, kdotool, xdotool" ;;
+  hyprctl|swaymsg|niri|kdotool|xdotool) TOOL="$FORCE_TOOL"; REASON="requested with --tool" ;;
+  *) die "--tool must be one of: hyprctl, swaymsg, niri, kdotool, xdotool" ;;
 esac
 
 if [ -z "$TOOL" ]; then
@@ -295,6 +298,7 @@ fi
 
 case "$TOOL" in
   hyprctl) die "hyprctl ships with Hyprland itself but isn't on your PATH. Reinstall the 'hyprland' package, or check your PATH." ;;
+  niri)    die "niri ships with the niri compositor itself but isn't on your PATH. Reinstall the 'niri' package, or check your PATH." ;;
   swaymsg) die "swaymsg ships with Sway itself but isn't on your PATH. Reinstall the 'sway' package, or check your PATH." ;;
 esac
 

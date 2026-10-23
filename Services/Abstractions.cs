@@ -35,6 +35,15 @@ public interface IWindowDetector
 
     /// <summary>Non-null when focus detection isn't possible on this system.</summary>
     string? Problem { get; }
+
+    /// <summary>
+    /// The external tool this desktop session needs for focus detection (hyprctl, swaymsg, kdotool, xdotool),
+    /// or null when none is needed (Windows) or the desktop isn't supported.
+    /// </summary>
+    string? RequiredTool { get; }
+
+    /// <summary>Re-runs detection, e.g. after the user installed <see cref="RequiredTool"/> while the app was open.</summary>
+    void Refresh();
 }
 
 /// <summary>Reports movement from a real (non-synthetic) mouse.</summary>

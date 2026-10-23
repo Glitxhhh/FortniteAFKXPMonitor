@@ -11,6 +11,12 @@ public sealed class WindowsWindowDetector : IWindowDetector
 
     public string? Problem => null;
 
+    public string? RequiredTool => null;
+
+    public void Refresh()
+    {
+    }
+
     public WindowInfo GetForeground()
     {
         IntPtr hwnd = GetForegroundWindow();

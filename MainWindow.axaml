@@ -10,6 +10,29 @@
         <TextBlock Classes="muted" TextWrapping="Wrap" Margin="0,0,0,16"
                    Text="Auto-click, hold input and camera nudges for GeForce NOW, GeForce Infinity, Amazon Luna, Xbox Cloud and Fortnite."/>
 
+        <!-- Linux setup (only shown on Linux, and only while something is missing) -->
+        <Border x:Name="SetupCard" Classes="card" IsVisible="False" BorderBrush="#FBBF24">
+            <StackPanel>
+                <TextBlock Text="SETUP NEEDED" Classes="section" Foreground="#FBBF24"/>
+
+                <StackPanel x:Name="InputRow" Margin="0,0,0,10" IsVisible="False">
+                    <TextBlock Text="Input access" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="InputText" Classes="muted" TextWrapping="Wrap" Margin="0,2,0,6"/>
+                    <Button x:Name="InputButton" Content="Fix permissions" Click="InputFix_Click"
+                            HorizontalAlignment="Left" IsVisible="False"/>
+                </StackPanel>
+
+                <StackPanel x:Name="ToolRow" Margin="0,0,0,10" IsVisible="False">
+                    <TextBlock Text="Focus detection" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="ToolText" Classes="muted" TextWrapping="Wrap" Margin="0,2,0,6"/>
+                    <Button x:Name="ToolButton" Content="Install focus tool" Click="ToolFix_Click"
+                            HorizontalAlignment="Left" IsVisible="False"/>
+                </StackPanel>
+
+                <TextBlock x:Name="SetupMessage" FontSize="11" TextWrapping="Wrap" IsVisible="False"/>
+            </StackPanel>
+        </Border>
+
         <!-- Status -->
         <Border Classes="card">
             <StackPanel>
@@ -101,8 +124,5 @@
                          ToolTip.Tip="Click, then press a key to rebind the global start/stop hotkey"/>
             </StackPanel>
         </Grid>
-
-        <TextBlock x:Name="WarningText" Foreground="#FBBF24" FontSize="11" Margin="0,10,0,0"
-                   TextWrapping="Wrap" IsVisible="False"/>
     </StackPanel>
 </Window>
