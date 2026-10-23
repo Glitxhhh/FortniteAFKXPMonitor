@@ -158,6 +158,8 @@ public partial class MainWindow : Window
 
     private void Toggle_Click(object? sender, RoutedEventArgs e) => Toggle();
 
+    private void ShortcutButton_Click(object? sender, RoutedEventArgs e) => _platform.Hotkey.ConfigureGlobalShortcut();
+
     private void ToggleFromShortcut()
     {
         long now = Environment.TickCount64;
@@ -211,6 +213,10 @@ public partial class MainWindow : Window
         SettingsPanel.IsEnabled = !running;
         NudgePanel.IsEnabled = !running;
         ToggleButton.Content = running ? "Stop" : "Start";
+        string? shortcutNote = _platform.Hotkey.GlobalShortcutStatus;
+        HotkeyNote.IsVisible = !string.IsNullOrEmpty(shortcutNote);
+        HotkeyNote.Text = shortcutNote ?? "";
+        ShortcutButton.IsVisible = _platform.Hotkey.CanConfigureGlobalShortcut;
         if (running) ToggleButton.Classes.Add("stop"); else ToggleButton.Classes.Remove("stop");
 
         bool paused = _engine.IsPaused;

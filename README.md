@@ -59,7 +59,16 @@ The global hotkey on Linux is not swallowed, so the focused app also sees the ke
 
 ### Keyboards forwarded by Deskflow, Synergy or Input Leap
 
-On Wayland those tools inject your keys into the compositor (through libei), so they never show up as devices in `/dev/input`, which is where the app reads its global hotkey from. A key typed on the forwarded keyboard reaches the focused window (that's why the hotkey box accepts it) but not the global hotkey. The desktop's own shortcut system *does* see those keys, so bind a shortcut there that runs one of these commands against the running app:
+On Wayland those tools inject your keys into the compositor (through libei), so they never show up as devices in `/dev/input`, which is where the app reads its global hotkey from. A key typed on the forwarded keyboard reaches the focused window but not that reader.
+
+So the app also registers its hotkey with your desktop through the XDG GlobalShortcuts portal, which does see those keys (tested on KDE Plasma 6 with Deskflow). This is automatic:
+
+- **First launch:** your desktop shows a one-time confirmation dialog for the shortcut. Approve it and F6 (or your chosen key) toggles the app from any keyboard. It appears in **System Settings > Shortcuts** as "Fortnite AFK XP Tool".
+- **Changing the hotkey** in the app's hotkey box silently moves the desktop's binding too (KDE; no dialog, no editor). On other desktops use **Change desktop shortcut...**, which opens the desktop's own shortcut editor.
+- The portal needs an app id, so the app writes a launcher entry, `~/.local/share/applications/org.glitxh.FortniteAFKXPMonitor.desktop` (and `~/.local/share/FortniteAFKXPMonitor/icon.png`). Delete them to remove it.
+- If the portal is unavailable, a note under the hotkey box says why and the `/dev/input` hotkey keeps working for physical keyboards.
+
+Desktops without a GlobalShortcuts portal (Sway, niri) can instead bind a key in their own config to a command that talks to the running app:
 
 ```bash
 FortniteAFKXPMonitor --toggle      # start if stopped, stop if running
@@ -67,9 +76,9 @@ FortniteAFKXPMonitor --start       # --stop is the opposite
 FortniteAFKXPMonitor --status      # prints "running" or "stopped"; exit code 0 = running, 1 = stopped, 2 = app not running
 ```
 
-On KDE Plasma: **System Settings > Keyboard > Shortcuts > Add New > Command or Script**, enter the full path of the executable followed by `--toggle`, then set the key (F6, say). Other desktops have the same idea: a `bind`/`bindsym` line with `exec` in the Hyprland/Sway config, or `spawn` in niri's `binds` block.
+For example `bindsym F6 exec /path/to/FortniteAFKXPMonitor --toggle` in Sway, or `F6 { spawn "/path/to/FortniteAFKXPMonitor" "--toggle"; }` in niri's `binds` block. The same bind also works on KDE (System Settings > Keyboard > Shortcuts > Add New > Command or Script) if you prefer it to the portal.
 
-If you bind the same key the app already uses as its own hotkey, both fire for a physical keyboard, so toggles within about 0.8 seconds of each other count as one.
+When more than one path fires for the same key press (for example a physical keyboard seen by both the `/dev/input` reader and the portal), toggles within about 0.8 seconds of each other count as one.
 
 ### Alt+Tab
 

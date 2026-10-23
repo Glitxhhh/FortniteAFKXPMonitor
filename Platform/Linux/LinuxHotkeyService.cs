@@ -12,11 +12,18 @@ public sealed class LinuxHotkeyService : IHotkeyService
 {
     private EvdevReader? _reader;
     private volatile int _code = -1;
+    private PortalShortcuts? _portal;
     private int _altMask;   // bit 0 = left Alt held, bit 1 = right Alt held
 
     public event Action? Pressed;
 
     public string? Problem { get; private set; }
+
+    public string? GlobalShortcutStatus => _portal?.Status;
+
+    public bool CanConfigureGlobalShortcut => _portal?.IsBound == true;
+
+    public void ConfigureGlobalShortcut() => _portal?.Configure();
 
     public bool AltHeld => Volatile.Read(ref _altMask) != 0;
 
@@ -29,6 +36,19 @@ public sealed class LinuxHotkeyService : IHotkeyService
         }
 
         _code = code;
+
+        // Also ask the desktop for the key: that path sees keys forwarded by Deskflow & co, which never reach /dev/input.
+        // Started once; the desktop keeps its own binding afterwards (changed in System Settings, not here).
+        if (_portal is null)
+        {
+            _portal = new PortalShortcuts();
+            _portal.Activated += () => Pressed?.Invoke();
+            _portal.Start(key);
+        }
+        else
+        {
+            _portal.Rebind(key);   // the user picked a new key in the app: move the desktop's binding too (KDE)
+        }
 
         if (_reader is null)
         {
@@ -69,6 +89,7 @@ public sealed class LinuxHotkeyService : IHotkeyService
 
     public void Dispose()
     {
+        _portal?.Dispose();
         _reader?.Dispose();
         _reader = null;
     }

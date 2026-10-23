@@ -22,6 +22,14 @@ public sealed class WindowsHotkeyService : IHotkeyService
 
     public bool AltHeld => false;
 
+    public string? GlobalShortcutStatus => null;
+
+    public bool CanConfigureGlobalShortcut => false;
+
+    public void ConfigureGlobalShortcut()
+    {
+    }
+
     public WindowsHotkeyService() => _proc = HookCallback;
 
     public bool Register(Key key)
