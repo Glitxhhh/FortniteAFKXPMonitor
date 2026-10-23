@@ -12,10 +12,13 @@ public sealed class LinuxHotkeyService : IHotkeyService
 {
     private EvdevReader? _reader;
     private volatile int _code = -1;
+    private int _altMask;   // bit 0 = left Alt held, bit 1 = right Alt held
 
     public event Action? Pressed;
 
     public string? Problem { get; private set; }
+
+    public bool AltHeld => Volatile.Read(ref _altMask) != 0;
 
     public bool Register(Key key)
     {
@@ -38,7 +41,7 @@ public sealed class LinuxHotkeyService : IHotkeyService
                 return false;
             }
 
-            _reader = new EvdevReader(paths, OnEvent);
+            _reader = new EvdevReader(paths, OnEvent, onLost: () => Volatile.Write(ref _altMask, 0));
         }
 
         Problem = null;
@@ -47,8 +50,20 @@ public sealed class LinuxHotkeyService : IHotkeyService
 
     private void OnEvent(ushort type, ushort code, int value)
     {
+        if (type != EV_KEY)
+            return;
+
+        // Track Alt so the engine can pause while you alt-tab. (A keyboard that disappears while Alt is down
+        // clears the state in the reader's onLost, so it can't get stuck.)
+        if (code == KEY_LEFTALT || code == KEY_RIGHTALT)
+        {
+            int bit = code == KEY_LEFTALT ? 1 : 2;
+            if (value == 1) Interlocked.Or(ref _altMask, bit);
+            else if (value == 0) Interlocked.And(ref _altMask, ~bit);
+        }
+
         // value 1 = press; 0 = release, 2 = auto-repeat (ignored)
-        if (type == EV_KEY && value == 1 && code == _code)
+        if (value == 1 && code == _code)
             Pressed?.Invoke();
     }
 

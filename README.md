@@ -57,6 +57,24 @@ Wayland has no generic way to ask which window is focused, so the tool needed de
 
 The global hotkey on Linux is not swallowed, so the focused app also sees the key. Pick a key the game doesn't use (F6 is fine for most).
 
+### Keyboards forwarded by Deskflow, Synergy or Input Leap
+
+On Wayland those tools inject your keys into the compositor (through libei), so they never show up as devices in `/dev/input`, which is where the app reads its global hotkey from. A key typed on the forwarded keyboard reaches the focused window (that's why the hotkey box accepts it) but not the global hotkey. The desktop's own shortcut system *does* see those keys, so bind a shortcut there that runs one of these commands against the running app:
+
+```bash
+FortniteAFKXPMonitor --toggle      # start if stopped, stop if running
+FortniteAFKXPMonitor --start       # --stop is the opposite
+FortniteAFKXPMonitor --status      # prints "running" or "stopped"; exit code 0 = running, 1 = stopped, 2 = app not running
+```
+
+On KDE Plasma: **System Settings > Keyboard > Shortcuts > Add New > Command or Script**, enter the full path of the executable followed by `--toggle`, then set the key (F6, say). Other desktops have the same idea: a `bind`/`bindsym` line with `exec` in the Hyprland/Sway config, or `spawn` in niri's `binds` block.
+
+If you bind the same key the app already uses as its own hotkey, both fire for a physical keyboard, so toggles within about 0.8 seconds of each other count as one.
+
+### Alt+Tab
+
+While Alt is held the app stops sending input and releases anything it was holding, then re-checks which window is focused and waits about 0.4 seconds before resuming, so you can alt-tab away (it stays paused in the other window) or back (it resumes). On Linux this is needed because a window switcher like KDE's doesn't change the focused window until you let go of Alt. This watches the keyboards the app can read in `/dev/input`, so like the hotkey it can't see Alt on a Deskflow-forwarded keyboard.
+
 ## Build
 
 ```

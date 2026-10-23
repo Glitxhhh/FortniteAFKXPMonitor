@@ -71,7 +71,8 @@ public sealed class EvdevReader : IDisposable
     private readonly List<Thread> _threads = new();
     private readonly CancellationTokenSource _cts = new();
 
-    public EvdevReader(IEnumerable<string> paths, Action<ushort, ushort, int> onEvent)
+    /// <param name="onLost">Called when a device stops delivering events (unplugged, or the reader is disposed).</param>
+    public EvdevReader(IEnumerable<string> paths, Action<ushort, ushort, int> onEvent, Action? onLost = null)
     {
         foreach (string path in paths)
         {
@@ -79,7 +80,7 @@ public sealed class EvdevReader : IDisposable
             if (fd < 0)
                 continue;
 
-            var thread = new Thread(() => ReadLoop(fd, onEvent, _cts.Token))
+            var thread = new Thread(() => ReadLoop(fd, onEvent, onLost, _cts.Token))
             {
                 IsBackground = true,
                 Name = "evdev " + path,
@@ -91,7 +92,7 @@ public sealed class EvdevReader : IDisposable
 
     public int DeviceCount => _threads.Count;
 
-    private static void ReadLoop(int fd, Action<ushort, ushort, int> onEvent, CancellationToken ct)
+    private static void ReadLoop(int fd, Action<ushort, ushort, int> onEvent, Action? onLost, CancellationToken ct)
     {
         var fds = new[] { new PollFd { fd = fd, events = POLLIN } };
         var buf = new byte[InputEventSize * 64];
@@ -121,6 +122,7 @@ public sealed class EvdevReader : IDisposable
         finally
         {
             close(fd);
+            onLost?.Invoke();
         }
     }
 

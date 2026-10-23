@@ -13,8 +13,13 @@ public sealed class AfkEngine
     /// <summary>Fortnite stops awarding AFK XP after this long without camera input.</summary>
     public const double XpTimeoutSeconds = 7 * 60;
 
+    /// <summary>After Alt is released, wait this long for an Alt+Tab to land before sending anything again.</summary>
+    private const int AltSettleMs = 400;
+
     private readonly IInputSimulator _input;
     private readonly IWindowDetector _detector;
+    private readonly Func<bool>? _altHeld;
+    private volatile bool _altPaused;
     private readonly Random _rng = Random.Shared;
     private CancellationTokenSource? _cts;
     private Task? _loop;
@@ -34,11 +39,20 @@ public sealed class AfkEngine
     private long _lastManualTicks;
     private int _manualResets;
 
-    public AfkEngine(IInputSimulator input, IWindowDetector detector)
+    /// <param name="altHeld">
+    /// Optional: true while Alt is held. Input is paused for that time (plus a short settle), because a window
+    /// switcher like KDE's Alt+Tab doesn't change the focused window until you let go, so the focus check alone
+    /// would keep clicking into it.
+    /// </param>
+    public AfkEngine(IInputSimulator input, IWindowDetector detector, Func<bool>? altHeld = null)
     {
         _input = input;
         _detector = detector;
+        _altHeld = altHeld;
     }
+
+    /// <summary>True while input is paused because Alt is held (or was just released).</summary>
+    public bool AltPaused => _altPaused;
 
     public bool IsRunning => _cts is not null;
 
@@ -135,6 +149,9 @@ public sealed class AfkEngine
         long nextDetect = 0;
         long detectTicks = Math.Max(1, _detector.PollIntervalMs) * Stopwatch.Frequency / 1000;
         bool wasBlocked = false;
+        bool wasAlt = false;
+        long altPauseUntil = 0;
+        long altSettleTicks = AltSettleMs * Stopwatch.Frequency / 1000;
         long nextAction = 0;
         long intervalTicks = Math.Max(10, s.IntervalMs) * Stopwatch.Frequency / 1000;
 
@@ -147,7 +164,19 @@ public sealed class AfkEngine
                     _target = TargetMatcher.Match(_detector.GetForeground());
                     nextDetect = Stopwatch.GetTimestamp() + detectTicks;
                 }
-                bool canSend = !s.RequireTarget || _target.IsTarget;
+
+                bool alt = _altHeld?.Invoke() ?? false;
+                if (wasAlt && !alt)
+                {
+                    // Alt just came up: re-check focus right away and give an Alt+Tab time to land.
+                    altPauseUntil = Stopwatch.GetTimestamp() + altSettleTicks;
+                    nextDetect = 0;
+                }
+                wasAlt = alt;
+                bool altPaused = alt || Stopwatch.GetTimestamp() < altPauseUntil;
+                _altPaused = altPaused;
+
+                bool canSend = !altPaused && (!s.RequireTarget || _target.IsTarget);
 
                 if (!canSend)
                 {
@@ -205,6 +234,7 @@ public sealed class AfkEngine
         }
         finally
         {
+            _altPaused = false;
             if (held)
                 Release(s);
             if (OperatingSystem.IsWindows()) NativeMethods.timeEndPeriod(1);

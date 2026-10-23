@@ -21,6 +21,8 @@ internal static class LinuxNative
     public const ushort BTN_LEFT = 0x110;
     public const ushort BTN_RIGHT = 0x111;
     public const ushort BTN_MIDDLE = 0x112;
+    public const ushort KEY_LEFTALT = 56;
+    public const ushort KEY_RIGHTALT = 100;
 
     // uinput ioctls
     public const ulong UI_DEV_CREATE = 0x5501;

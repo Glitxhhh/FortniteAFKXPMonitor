@@ -27,10 +27,16 @@ public partial class MainWindow : Window
     private bool _setupChecking;
     private bool _setupActionRunning;
 
+    // The global hotkey and a desktop shortcut running "--toggle" can both fire for one physical key press
+    // (see CommandChannel). Toggles arriving this close together count as one.
+    private const long ShortcutDebounceMs = 800;
+    private long _lastShortcutTick = -ShortcutDebounceMs;
+    private readonly CommandChannel.Server _commandServer;
+
     public MainWindow()
     {
         InitializeComponent();
-        _engine = new AfkEngine(_platform.Input, _platform.WindowDetector);
+        _engine = new AfkEngine(_platform.Input, _platform.WindowDetector, () => _platform.Hotkey.AltHeld);
         ApplySettingsToUi();
 
         ActionMouse.IsCheckedChanged += (_, _) => UpdateRowVisibility();
@@ -41,8 +47,9 @@ public partial class MainWindow : Window
         HotkeyBox.KeyDown += HotkeyBox_KeyDown;
 
         _platform.Mouse.UserMoved += _engine.NotifyManualCameraInput;
-        _platform.Hotkey.Pressed += () => Dispatcher.UIThread.Post(Toggle);
+        _platform.Hotkey.Pressed += () => Dispatcher.UIThread.Post(ToggleFromShortcut);
         _platform.Hotkey.Register(_settings.Hotkey);
+        _commandServer = new CommandChannel.Server(HandleCommandAsync);
 
         _ui.Tick += (_, _) => RefreshStatus();
         _ui.Start();
@@ -61,6 +68,7 @@ public partial class MainWindow : Window
     {
         _ui.Stop();
         _setupTimer.Stop();
+        _commandServer.Dispose();
         _engine.Stop();
         _platform.Dispose();
         ReadSettingsFromUi();
@@ -150,6 +158,28 @@ public partial class MainWindow : Window
 
     private void Toggle_Click(object? sender, RoutedEventArgs e) => Toggle();
 
+    private void ToggleFromShortcut()
+    {
+        long now = Environment.TickCount64;
+        if (now - _lastShortcutTick < ShortcutDebounceMs)
+            return;
+        _lastShortcutTick = now;
+        Toggle();
+    }
+
+    /// <summary>Runs a --toggle / --start / --stop / --status command from another process on the UI thread.</summary>
+    private Task<string> HandleCommandAsync(string command) =>
+        Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            switch (command)
+            {
+                case "toggle": ToggleFromShortcut(); break;
+                case "start" when !_engine.IsRunning: Toggle(); break;
+                case "stop" when _engine.IsRunning: Toggle(); break;
+            }
+            return _engine.IsRunning ? "running" : "stopped";
+        }).GetTask();
+
     private void Toggle()
     {
         if (_engine.IsRunning)
@@ -201,6 +231,11 @@ public partial class MainWindow : Window
         {
             SetStatus("Paused", Warn);
             TargetText.Text = $"Countdown frozen. Press {hotkey} or Start to resume.";
+        }
+        else if (_engine.AltPaused)
+        {
+            SetStatus("Paused - Alt held", Warn);
+            TargetText.Text = "Input is on hold while you switch windows (countdown keeps running).";
         }
         else
         {

@@ -64,5 +64,11 @@ public interface IHotkeyService : IDisposable
     /// <summary>Binds the hotkey. Returns false if it couldn't be registered.</summary>
     bool Register(Key key);
 
+    /// <summary>
+    /// True while Alt is physically held, so the engine can stay out of the way of Alt+Tab. Only Linux reports
+    /// this: on Windows the Alt+Tab switcher becomes the foreground window, which the focus check already catches.
+    /// </summary>
+    bool AltHeld { get; }
+
     string? Problem { get; }
 }

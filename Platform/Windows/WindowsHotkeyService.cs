@@ -20,6 +20,8 @@ public sealed class WindowsHotkeyService : IHotkeyService
 
     public string? Problem { get; private set; }
 
+    public bool AltHeld => false;
+
     public WindowsHotkeyService() => _proc = HookCallback;
 
     public bool Register(Key key)
