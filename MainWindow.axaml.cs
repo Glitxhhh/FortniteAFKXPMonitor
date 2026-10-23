@@ -1,8 +1,10 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using FortniteAFKXPMonitor.Platform.Linux;
 using FortniteAFKXPMonitor.Services;
 
@@ -45,6 +47,16 @@ public partial class MainWindow : Window
         ModeHold.IsCheckedChanged += (_, _) => UpdateRowVisibility();
         KeyBox.KeyDown += KeyBox_KeyDown;
         HotkeyBox.KeyDown += HotkeyBox_KeyDown;
+
+        // A text box keeps keyboard focus until something else takes it, and clicking empty space doesn't.
+        // The key/hotkey boxes also swallow every key (Tab included), so without this you can't leave them.
+        // Any click (or tap) that isn't on a text box hands focus to the window itself.
+        Focusable = true;
+        AddHandler(PointerPressedEvent, (_, e) =>
+        {
+            if (e.Source is Visual source && source.FindAncestorOfType<TextBox>(includeSelf: true) is null)
+                Focus();
+        }, RoutingStrategies.Tunnel);
 
         _platform.Mouse.UserMoved += _engine.NotifyManualCameraInput;
         _platform.Hotkey.Pressed += () => Dispatcher.UIThread.Post(ToggleFromShortcut);
