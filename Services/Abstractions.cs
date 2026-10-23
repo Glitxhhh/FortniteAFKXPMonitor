@@ -73,11 +73,5 @@ public interface IHotkeyService : IDisposable
     /// <summary>Linux: state of the desktop-portal global shortcut (which also catches Deskflow-forwarded keys), for the UI. Null elsewhere.</summary>
     string? GlobalShortcutStatus { get; }
 
-    /// <summary>True when the desktop owns a global shortcut for the app whose key can be changed through <see cref="ConfigureGlobalShortcut"/>.</summary>
-    bool CanConfigureGlobalShortcut { get; }
-
-    /// <summary>Opens the desktop's own editor for the app's global shortcut (the key it's bound to lives in the desktop, not the app).</summary>
-    void ConfigureGlobalShortcut();
-
     string? Problem { get; }
 }

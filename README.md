@@ -64,9 +64,18 @@ On Wayland those tools inject your keys into the compositor (through libei), so 
 So the app also registers its hotkey with your desktop through the XDG GlobalShortcuts portal, which does see those keys (tested on KDE Plasma 6 with Deskflow). This is automatic:
 
 - **First launch:** your desktop shows a one-time confirmation dialog for the shortcut. Approve it and F6 (or your chosen key) toggles the app from any keyboard. It appears in **System Settings > Shortcuts** as "Fortnite AFK XP Tool".
-- **Changing the hotkey** in the app's hotkey box silently moves the desktop's binding too (KDE; no dialog, no editor). On other desktops use **Change desktop shortcut...**, which opens the desktop's own shortcut editor.
+- **Changing the hotkey** in the app's hotkey box silently moves the desktop's binding too (KDE; no dialog, no editor). On other desktops the desktop keeps its own key, so change it in the desktop's shortcut settings.
 - The portal needs an app id, so the app writes a launcher entry, `~/.local/share/applications/org.glitxh.FortniteAFKXPMonitor.desktop` (and `~/.local/share/FortniteAFKXPMonitor/icon.png`). Delete them to remove it.
 - If the portal is unavailable, a note under the hotkey box says why and the `/dev/input` hotkey keeps working for physical keyboards.
+
+| Session | Hotkey from a forwarded keyboard | Alt+Tab pause for a forwarded keyboard |
+| --- | --- | --- |
+| KDE Plasma (Wayland) | desktop portal (tested) | KDE's switcher signals (tested) |
+| X11 (GNOME, XFCE, Cinnamon, i3, KDE...) | X11 key grab (tested against a nested X server with XTest input, which is how Deskflow injects on X11) | X11 key state (tested the same way) |
+| GNOME / Hyprland (Wayland) | desktop portal (should work, **untested**; Hyprland needs one `bind = , F6, global, org.glitxh.FortniteAFKXPMonitor:toggle` line in `hyprland.conf`) | physical keyboards only |
+| Sway, niri | `--toggle` command below | not needed: they switch windows instantly, so the focus check already handles it |
+
+On X11 sessions the app grabs the key through X instead of using the portal, and reads Alt from the X server.
 
 Desktops without a GlobalShortcuts portal (Sway, niri) can instead bind a key in their own config to a command that talks to the running app:
 
@@ -82,7 +91,7 @@ When more than one path fires for the same key press (for example a physical key
 
 ### Alt+Tab
 
-While Alt is held the app stops sending input and releases anything it was holding, then re-checks which window is focused and waits about 0.4 seconds before resuming, so you can alt-tab away (it stays paused in the other window) or back (it resumes). On Linux this is needed because a window switcher like KDE's doesn't change the focused window until you let go of Alt. It reads Alt from the keyboards the app can see in `/dev/input`, and on KDE it also listens for KWin's own window-switcher shortcut, so Alt+Tab is caught from any keyboard, including ones forwarded by Deskflow.
+While Alt is held the app stops sending input and releases anything it was holding, then re-checks which window is focused and waits about 0.4 seconds before resuming, so you can alt-tab away (it stays paused in the other window) or back (it resumes). On Linux this is needed because a window switcher like KDE's doesn't change the focused window until you let go of Alt. It reads Alt from the keyboards the app can see in `/dev/input`. On KDE it also listens for KWin's own window-switcher shortcut, and on X11 it asks the X server, so Alt+Tab is caught from any keyboard, including ones forwarded by Deskflow.
 
 ## Build
 

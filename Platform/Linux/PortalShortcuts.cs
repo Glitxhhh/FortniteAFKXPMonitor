@@ -105,7 +105,7 @@ internal sealed class PortalShortcuts : IDisposable
     /// Changes the key the desktop has bound to the shortcut, for when the user picks a new hotkey in the app.
     /// The portal itself can't do this (once an id is known it keeps the user's key and ignores our preference), so on
     /// KDE this makes the same call System Settings uses to change another app's shortcut: no dialog, no editor.
-    /// Other desktops ignore it and keep the "Change desktop shortcut" button.
+    /// Other desktops ignore it and keep their own key (change it in their shortcut settings).
     /// </summary>
     public void Rebind(Key key)
     {
@@ -130,36 +130,7 @@ internal sealed class PortalShortcuts : IDisposable
             catch (Exception ex)
             {
                 Console.Error.WriteLine("[portal] couldn't change the desktop shortcut: " + ex.Message);
-                Status = "The desktop shortcut keeps its old key (this desktop can't be changed from the app). Use \"Change desktop shortcut...\".";
-            }
-        });
-    }
-
-    /// <summary>
-    /// Asks the desktop to show its own editor for this app's shortcuts (portal v2). Changing the key here is the
-    /// only way to rebind: once a shortcut id is known the desktop keeps the user's key and ignores our preference.
-    /// </summary>
-    public void Configure()
-    {
-        string? session = _session;
-        if (session is null || _connection is null)
-            return;
-
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await CallAsync(ShortcutsInterface, "ConfigureShortcuts", "osa{sv}", (ref MessageWriter w) =>
-                {
-                    w.WriteObjectPath(session);
-                    w.WriteString("");   // parent_window
-                    var options = w.WriteDictionaryStart();
-                    w.WriteDictionaryEnd(options);
-                });
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine("[portal] ConfigureShortcuts failed: " + ex.Message);
+                Status = "The desktop shortcut keeps its old key (this desktop can't be changed from the app). Change it in your desktop's shortcut settings.";
             }
         });
     }
@@ -217,9 +188,12 @@ internal sealed class PortalShortcuts : IDisposable
 
         IsBound = true;
         string trigger = TriggerDescription(results);
+        string desktop = Environment.GetEnvironmentVariable("XDG_CURRENT_DESKTOP") ?? "";
         Status = trigger.Length > 0
             ? $"Also bound through your desktop's global shortcuts: {trigger} (change it in System Settings > Shortcuts)"
-            : "Registered with your desktop, but no key is assigned. Set one in System Settings > Shortcuts > Fortnite AFK XP Tool.";
+            : desktop.Contains("Hyprland", StringComparison.OrdinalIgnoreCase)
+                ? $"Registered with Hyprland. Add this line to hyprland.conf to assign a key:  bind = , F6, global, {AppId}:{ShortcutId}"
+                : "Registered with your desktop, but no key is assigned. Set one in your desktop's shortcut settings (KDE: System Settings > Shortcuts > Fortnite AFK XP Tool).";
     }
 
     /// <summary>Pulls the first shortcut's "trigger_description" out of a BindShortcuts response.</summary>

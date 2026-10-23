@@ -13,6 +13,7 @@ public sealed class LinuxHotkeyService : IHotkeyService
     private EvdevReader? _reader;
     private volatile int _code = -1;
     private PortalShortcuts? _portal;
+    private X11Keys? _x11;
     private readonly KdeSwitcherWatcher _switcher = new();
     private int _altMask;   // bit 0 = left Alt held, bit 1 = right Alt held
 
@@ -20,17 +21,13 @@ public sealed class LinuxHotkeyService : IHotkeyService
 
     public string? Problem { get; private set; }
 
-    public string? GlobalShortcutStatus => _portal?.Status;
-
-    public bool CanConfigureGlobalShortcut => _portal?.IsBound == true;
-
-    public void ConfigureGlobalShortcut() => _portal?.Configure();
+    public string? GlobalShortcutStatus => _x11?.Status ?? _portal?.Status;
 
     /// <summary>
     /// True while a window switch (Alt+Tab) is in progress: Alt is held on a keyboard the app can read, or - on KDE,
     /// for any keyboard including Deskflow-forwarded ones - KWin's window switcher is open.
     /// </summary>
-    public bool AltHeld => Volatile.Read(ref _altMask) != 0 || _switcher.Active;
+    public bool AltHeld => Volatile.Read(ref _altMask) != 0 || _switcher.Active || (_x11?.AltHeld ?? false);
 
     public bool Register(Key key)
     {
@@ -42,18 +39,29 @@ public sealed class LinuxHotkeyService : IHotkeyService
 
         _code = code;
 
-        // Also ask the desktop for the key: that path sees keys forwarded by Deskflow & co, which never reach /dev/input.
-        // Started once; the desktop keeps its own binding afterwards (changed in System Settings, not here).
-        if (_portal is null)
+        // Also ask the display server for the key: that path sees keys forwarded by Deskflow & co, which never reach
+        // /dev/input. X11 sessions grab the key through X; Wayland sessions go through the desktop portal.
+        if (_x11 is null && _portal is null)
         {
-            _portal = new PortalShortcuts();
-            _portal.Activated += () => Pressed?.Invoke();
-            _portal.Start(key);
-            _switcher.Start();   // KDE only: tells us when the Alt+Tab switcher is open, for any keyboard
+            if (IsX11Session && StartX11(key))
+            {
+                // X11 handles the hotkey and Alt tracking
+            }
+            else
+            {
+                _portal = new PortalShortcuts();
+                _portal.Activated += () => Pressed?.Invoke();
+                _portal.Start(key);
+                _switcher.Start();   // KDE only: tells us when the Alt+Tab switcher is open, for any keyboard
+            }
+        }
+        else if (_x11 is not null)
+        {
+            _x11.SetHotkey(key);     // the user picked a new key in the app: move the grab
         }
         else
         {
-            _portal.Rebind(key);   // the user picked a new key in the app: move the desktop's binding too (KDE)
+            _portal!.Rebind(key);    // ... or move the desktop's binding (KDE)
         }
 
         if (_reader is null)
@@ -93,8 +101,26 @@ public sealed class LinuxHotkeyService : IHotkeyService
             Pressed?.Invoke();
     }
 
+    private static bool IsX11Session =>
+        string.Equals(Environment.GetEnvironmentVariable("XDG_SESSION_TYPE"), "x11", StringComparison.OrdinalIgnoreCase)
+        && !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY"));
+
+    private bool StartX11(Key key)
+    {
+        var x11 = new X11Keys();
+        x11.Pressed += () => Pressed?.Invoke();
+        if (!x11.Start(key))
+        {
+            x11.Dispose();
+            return false;
+        }
+        _x11 = x11;
+        return true;
+    }
+
     public void Dispose()
     {
+        _x11?.Dispose();
         _switcher.Dispose();
         _portal?.Dispose();
         _reader?.Dispose();

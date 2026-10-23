@@ -126,7 +126,5 @@
         </Grid>
 
         <TextBlock x:Name="HotkeyNote" Classes="muted" FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0" IsVisible="False"/>
-        <Button x:Name="ShortcutButton" Content="Change desktop shortcut..." Click="ShortcutButton_Click"
-                HorizontalAlignment="Left" Margin="0,6,0,0" FontSize="11" IsVisible="False"/>
     </StackPanel>
 </Window>
