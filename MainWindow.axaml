@@ -10,6 +10,20 @@
         <TextBlock Classes="muted" TextWrapping="Wrap" Margin="0,0,0,16"
                    Text="Auto-click, hold input and camera nudges for GeForce NOW, GeForce Infinity, Amazon Luna, Xbox Cloud and Fortnite."/>
 
+        <!-- A newer GitHub release exists -->
+        <Border x:Name="UpdateCard" Classes="card" IsVisible="False" BorderBrush="#4ADE80">
+            <StackPanel>
+                <TextBlock Text="UPDATE AVAILABLE" Classes="section" Foreground="#4ADE80"/>
+                <TextBlock x:Name="UpdateText" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                <ProgressBar x:Name="UpdateProgress" Minimum="0" Maximum="100" Height="6" MinHeight="6"
+                             Margin="0,0,0,8" IsVisible="False" Background="#12131C" Foreground="#4ADE80"/>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button x:Name="UpdateNowButton" Content="Update now" Click="UpdateNow_Click"/>
+                    <Button x:Name="ReleaseNotesButton" Content="Release notes" Click="ReleaseNotes_Click"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
         <!-- Linux setup (only shown on Linux, and only while something is missing) -->
         <Border x:Name="SetupCard" Classes="card" IsVisible="False" BorderBrush="#FBBF24">
             <StackPanel>
@@ -126,5 +140,19 @@
         </Grid>
 
         <TextBlock x:Name="HotkeyNote" Classes="muted" FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0" IsVisible="False"/>
+
+        <!-- The app itself: launcher shortcut and updates -->
+        <Border Classes="card" Margin="0,16,0,0">
+            <StackPanel>
+                <TextBlock Text="APP" Classes="section"/>
+                <TextBlock x:Name="VersionText" Classes="muted" Margin="0,0,0,8"/>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button x:Name="ShortcutButton" Content="Add to Start menu" Click="Shortcut_Click"/>
+                    <Button x:Name="UpdateCheckButton" Content="Check for updates" Click="UpdateCheck_Click"/>
+                </StackPanel>
+                <CheckBox x:Name="AutoUpdateBox" IsChecked="True" Margin="0,8,0,0" Content="Check for updates when the app starts"/>
+                <TextBlock x:Name="AppMessage" FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0" IsVisible="False"/>
+            </StackPanel>
+        </Border>
     </StackPanel>
 </Window>

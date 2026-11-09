@@ -34,6 +34,11 @@ public sealed class AppSettings
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public Key Hotkey { get; set; } = Key.F6;
 
+    /// <summary>Look for a newer GitHub release when the app starts (at most every few hours).</summary>
+    public bool CheckForUpdates { get; set; } = true;
+
+    public DateTime LastUpdateCheckUtc { get; set; } = DateTime.MinValue;
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,

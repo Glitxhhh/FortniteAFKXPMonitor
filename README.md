@@ -93,6 +93,15 @@ When more than one path fires for the same key press (for example a physical key
 
 While Alt is held the app stops sending input and releases anything it was holding, then re-checks which window is focused and waits about 0.4 seconds before resuming, so you can alt-tab away (it stays paused in the other window) or back (it resumes). On Linux this is needed because a window switcher like KDE's doesn't change the focused window until you let go of Alt. It reads Alt from the keyboards the app can see in `/dev/input`. On KDE it also listens for KWin's own window-switcher shortcut, and on X11 it asks the X server, so Alt+Tab is caught from any keyboard, including ones forwarded by Deskflow.
 
+## Shortcut and updates
+
+The **APP** card at the bottom of the window has:
+
+- **Add to Start menu** (Windows) / **Add to app launcher** (Linux): puts the app in the Start menu or app launcher so you can find it by searching. Click it again after moving or updating the app and it replaces the old entry. On Windows it also removes older shortcuts, under any name, that launch an exe with the same name. On Linux it rewrites `~/.local/share/applications/org.glitxh.FortniteAFKXPMonitor.desktop` (the same entry the global hotkey needs) and refreshes its icon.
+- **Check for updates**, and a checkbox to check automatically when the app starts (at most every 6 hours). When a newer GitHub release exists a green card appears with **Update now**: it downloads the release for your system, checks the size, the SHA-256 GitHub reports for the file and that it's a real executable, swaps the app for the new version and restarts it. On Windows the previous exe is kept as `FortniteAFKXPMonitor.exe.old` until the next start.
+
+Releases aren't code-signed, so updating trusts whatever this repository publishes on GitHub (over HTTPS). If the app lives somewhere it can't write to (for example `Program Files` without administrator rights) the update says so and you can download the release yourself. A build made without a release version number, such as a local dev build, counts as older than every release and will offer to update.
+
 ## Build
 
 ```

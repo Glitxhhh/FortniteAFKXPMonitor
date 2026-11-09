@@ -12,6 +12,12 @@ internal static class Program
         if (CommandChannel.TryParse(args, out string command))
             return CommandChannel.RunClient(command);
 
+        // Started by an update: let the old copy finish exiting first, then tidy up what it left behind.
+        int waitAt = Array.IndexOf(args, "--wait-for");
+        if (waitAt >= 0 && waitAt + 1 < args.Length && int.TryParse(args[waitAt + 1], out int pid))
+            UpdateService.WaitForExit(pid);
+        UpdateService.CleanupAfterUpdate();
+
         return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }
 

@@ -403,9 +403,12 @@ internal sealed class PortalShortcuts : IDisposable
 /// The portal only accepts app ids that have a matching .desktop file, so write one for the current user
 /// (no root needed). It also gives the app a launcher entry and the name KDE shows in its shortcut dialog.
 /// </summary>
+internal sealed record DesktopEntryResult(string Path, string? PreviousExec, bool Changed);
+
 internal static class DesktopEntry
 {
-    public static void EnsureInstalled()
+    /// <summary>Writes (or refreshes) the launcher entry, and says what it replaced.</summary>
+    public static DesktopEntryResult EnsureInstalled()
     {
         string? exe = Environment.ProcessPath;
         if (string.IsNullOrEmpty(exe))
@@ -424,14 +427,29 @@ internal static class DesktopEntry
             "Type=Application\n" +
             "Name=Fortnite AFK XP Tool\n" +
             "Comment=AFK XP helper\n" +
+            "Keywords=AFK;XP;Fortnite;GeForce;Xbox;clicker;\n" +
             $"Exec={ExecQuote(exe)}\n" +
             (iconPath.Length > 0 ? $"Icon={iconPath}\n" : "") +
             "Terminal=false\n" +
             "Categories=Utility;\n";
 
         string path = Path.Combine(applications, PortalShortcuts.AppId + ".desktop");
-        if (!File.Exists(path) || File.ReadAllText(path) != content)
-            File.WriteAllText(path, content);   // rewritten when the app moves, so Exec stays right
+        string? existing = File.Exists(path) ? File.ReadAllText(path) : null;
+        bool changed = existing != content;
+        if (changed)
+            File.WriteAllText(path, content);   // rewritten when the app moves or updates, so Exec stays right
+        return new DesktopEntryResult(path, existing is null ? null : ParseExec(existing), changed);
+    }
+
+    /// <summary>The program an existing entry launches, for telling the user what was replaced.</summary>
+    private static string? ParseExec(string entry)
+    {
+        foreach (string line in entry.Split('\n'))
+        {
+            if (line.StartsWith("Exec=", StringComparison.Ordinal))
+                return line[5..].Trim().Trim('"');
+        }
+        return null;
     }
 
     private static string WriteIcon(string dataHome)
@@ -441,12 +459,9 @@ internal static class DesktopEntry
             string dir = Path.Combine(dataHome, "FortniteAFKXPMonitor");
             Directory.CreateDirectory(dir);
             string path = Path.Combine(dir, "icon.png");
-            if (!File.Exists(path))
-            {
-                using Stream icon = AssetLoader.Open(new Uri("avares://FortniteAFKXPMonitor/Assets/Icon.png"));
-                using FileStream file = File.Create(path);
-                icon.CopyTo(file);
-            }
+            using (Stream icon = AssetLoader.Open(new Uri("avares://FortniteAFKXPMonitor/Assets/Icon.png")))
+            using (FileStream file = File.Create(path))
+                icon.CopyTo(file);   // always refreshed, so an updated app doesn't keep an old icon
             return path;
         }
         catch
