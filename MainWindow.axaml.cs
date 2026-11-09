@@ -63,6 +63,12 @@ public partial class MainWindow : Window
         _platform.Hotkey.Register(_settings.Hotkey);
         _commandServer = new CommandChannel.Server(HandleCommandAsync);
 
+        VersionText.Text = $"Version {UpdateService.CurrentVersion}";
+        ShortcutButton.Content = AppShortcut.ButtonText;
+        // Quietly look for a newer release (at most every few hours), unless turned off.
+        if (_settings.CheckForUpdates && DateTime.UtcNow - _settings.LastUpdateCheckUtc > TimeSpan.FromHours(6))
+            _ = CheckForUpdatesAsync(manual: false);
+
         _ui.Tick += (_, _) => RefreshStatus();
         _ui.Start();
         RefreshStatus();
@@ -107,6 +113,7 @@ public partial class MainWindow : Window
         NudgeMinutesBox.Text = _settings.NudgeMinutes.ToString("0.##");
         NudgePixelsBox.Text = _settings.NudgePixels.ToString();
         RequireTargetBox.IsChecked = _settings.RequireTarget;
+        AutoUpdateBox.IsChecked = _settings.CheckForUpdates;
         UpdateRowVisibility();
     }
 
@@ -126,6 +133,7 @@ public partial class MainWindow : Window
             _settings.NudgePixels = Math.Clamp(pixels, 1, 1000);
 
         _settings.RequireTarget = RequireTargetBox.IsChecked == true;
+        _settings.CheckForUpdates = AutoUpdateBox.IsChecked == true;
 
         // Echo back the clamped values.
         IntervalBox.Text = _settings.IntervalMs.ToString();
@@ -276,6 +284,105 @@ public partial class MainWindow : Window
             : since > AfkEngine.XpTimeoutSeconds - 150 ? Warn
             : Accent;
         StatsText.Text = $"{_engine.ActionCount:N0} inputs sent · {_engine.NudgeCount} camera nudges · {_engine.ManualResetCount} manual resets";
+    }
+
+    // ---- shortcut and updates ---------------------------------------------
+
+    private UpdateInfo? _update;
+    private bool _updating;
+
+    private void ShowAppMessage(string text, bool? good)
+    {
+        AppMessage.Text = text;
+        AppMessage.Foreground = good switch { true => Good, false => Warn, _ => Primary };
+        AppMessage.IsVisible = true;
+    }
+
+    private void Shortcut_Click(object? sender, RoutedEventArgs e)
+    {
+        ShortcutResult result = AppShortcut.Install();
+        ShowAppMessage(result.Message, result.Success);
+    }
+
+    private async void UpdateCheck_Click(object? sender, RoutedEventArgs e) => await CheckForUpdatesAsync(manual: true);
+
+    /// <param name="manual">True when the user asked: say so when there's nothing new, or when it fails.</param>
+    private async Task CheckForUpdatesAsync(bool manual)
+    {
+        if (_updating) return;
+        UpdateCheckButton.IsEnabled = false;
+        if (manual) ShowAppMessage("Checking for updates...", null);
+
+        try
+        {
+            UpdateCheck check = await UpdateService.CheckAsync();
+            _settings.LastUpdateCheckUtc = DateTime.UtcNow;
+
+            if (check.Update is { } info)
+            {
+                _update = info;
+                UpdateText.Text = $"{info.Tag} is out (you have v{UpdateService.CurrentVersion}).";
+                UpdateCard.IsVisible = true;
+                if (manual) ShowAppMessage($"{info.Tag} is available - see the green card at the top.", true);
+            }
+            else if (manual)
+            {
+                ShowAppMessage($"You're up to date (v{UpdateService.CurrentVersion}).", true);
+            }
+        }
+        catch (Exception ex)
+        {
+            if (manual) ShowAppMessage($"Couldn't check for updates: {ex.Message}", false);   // a failed startup check stays silent
+        }
+        finally
+        {
+            UpdateCheckButton.IsEnabled = true;
+        }
+    }
+
+    private void ReleaseNotes_Click(object? sender, RoutedEventArgs e) =>
+        UpdateService.OpenInBrowser(_update?.ReleaseUrl ?? UpdateService.ReleasesPage);
+
+    private async void UpdateNow_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_update is not { } info || _updating) return;
+        _updating = true;
+
+        // Nothing should be pressed or clicking while the app swaps itself out.
+        if (_engine.IsRunning)
+        {
+            _platform.Mouse.Stop();
+            _engine.Stop();
+            RefreshStatus();
+        }
+
+        UpdateNowButton.IsEnabled = false;
+        UpdateCheckButton.IsEnabled = false;
+        UpdateProgress.Value = 0;
+        UpdateProgress.IsVisible = true;
+        var progress = new Progress<double>(p =>
+        {
+            UpdateProgress.Value = p * 100;
+            UpdateText.Text = $"Downloading {info.Tag}... {p:P0}";
+        });
+
+        try
+        {
+            string installed = await UpdateService.InstallAsync(info, progress);
+            UpdateText.Text = "Updated. Restarting...";
+            ReadSettingsFromUi();
+            _settings.Save();
+            UpdateService.RestartApp(installed);   // waits for this process to exit before it starts up
+            Close();
+        }
+        catch (Exception ex)
+        {
+            UpdateText.Text = $"Couldn't update: {ex.Message}";
+            UpdateProgress.IsVisible = false;
+            UpdateNowButton.IsEnabled = true;
+            _updating = false;
+            UpdateCheckButton.IsEnabled = true;
+        }
     }
 
     // ---- Linux setup card -------------------------------------------------
